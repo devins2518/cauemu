@@ -1,4 +1,4 @@
-use std::{ops::Deref, ptr::NonNull};
+use std::ptr::NonNull;
 
 pub struct Arm7TDMI {
     registers: [u32; 16],
@@ -7,8 +7,9 @@ pub struct Arm7TDMI {
     abt_registers: [u32; 2],
     irq_registers: [u32; 2],
     und_registers: [u32; 2],
-    cpsr: NonNull<Psr>,
-    spsr: [Psr; 6],
+    cpsr: Psr,
+    spsr: Option<NonNull<Psr>>,
+    _spsr: [Psr; 5],
     mode: Mode,
 
     clocks: usize,
@@ -24,17 +25,13 @@ impl Arm7TDMI {
             abt_registers: [0x0; 2],
             irq_registers: [0x0; 2],
             und_registers: [0x0; 2],
-            cpsr: NonNull::dangling(),
-            spsr: [Psr::default(); 6],
+            cpsr: Psr::default(),
+            spsr: None,
+            _spsr: [Psr::default(); 5],
             mode: Mode::User,
 
             clocks: 0,
         }
-    }
-
-    pub fn init(&mut self) {
-        // SAFETY: self is already initialized and self.spsr will not move from `main()`'s stack.
-        self.cpsr = unsafe { NonNull::new_unchecked(&mut self.spsr[0] as *mut _) };
     }
 
     pub fn clock(&mut self) {
@@ -91,11 +88,6 @@ impl Arm7TDMI {
     fn get_pc(&mut self) -> &mut u32 {
         &mut self.registers[15]
     }
-
-    fn get_cpsr(&mut self) -> &mut Psr {
-        // UNSAFE: This is actually unsafe as we won't enforce XOR aliasing.
-        unsafe { self.cpsr.as_mut() }
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -147,7 +139,7 @@ impl<'a> Operand<'a> {
             Operand::ArithShiftR(v, r) => (v as i32 >> r) as u32,
             Operand::RotateRReg(v, r) => v.rotate_right(r),
             Operand::RotateRExt(r) => {
-                let c = unsafe { &mut cpu.cpsr.as_mut().carry };
+                let c = &mut cpu.cpsr.carry;
                 let one = r & 0x1;
                 let r = ((*c as u32) << 31) | (r >> 1);
                 *c = one == 1;
@@ -155,6 +147,27 @@ impl<'a> Operand<'a> {
             }
         }
     }
+}
+
+enum PsrArg {
+    Cpsr,
+    Spsr,
+}
+
+impl PsrArg {
+    fn get(self, cpu: &mut Arm7TDMI) -> &mut Psr {
+        match self {
+            PsrArg::Cpsr => &mut cpu.cpsr,
+            PsrArg::Spsr => unsafe { cpu.spsr.unwrap_unchecked().as_mut() },
+        }
+    }
+}
+
+enum Field {
+    Flags,
+    Status,
+    Extension,
+    Control,
 }
 
 // Instruction set implementation
@@ -170,13 +183,27 @@ impl Arm7TDMI {
         }
     }
     fn mvn(&mut self, rd: Operand, op2: Operand) {
-        unimplemented!()
+        if let Operand::Register(r) = rd {
+            let val = op2.get(self);
+            *r = !val;
+        } else {
+            unsafe { std::hint::unreachable_unchecked() }
+        }
     }
-    fn mrs(&mut self, rd: Operand, op2: Operand) {
-        unimplemented!()
-    }
-    fn msr(&mut self, rd: Operand, op2: Operand) {
-        unimplemented!()
+
+    /// Move the contents of the CPSR or SPSR into a register.
+    fn mrs(&mut self, rd: Operand, psr: PsrArg) {
+        if let Operand::Register(r) = rd {
+            let psr = if let PsrArg::Cpsr = psr {
+                self.cpsr
+            } else {
+                // Safety: Calling MRS with SPSR in User mode is undefined. We can just crash
+                // here.
+                unsafe { *self.spsr.unwrap_unchecked().as_ref() }
+            };
+        } else {
+            unsafe { std::hint::unreachable_unchecked() }
+        }
     }
 }
 
@@ -188,11 +215,8 @@ mod test {
     fn test_operands() {
         let op = Operand::RotateRExt(0b10100101100011010011010001101001);
         let mut cpu = Arm7TDMI::new();
-        cpu.init();
-        unsafe {
-            cpu.cpsr.as_mut().carry = false;
-        }
+        cpu.cpsr.carry = false;
         assert_eq!(op.get(&mut cpu), 0b01010010110001101001101000110100);
-        assert!(unsafe { cpu.cpsr.as_ref().carry });
+        assert!(cpu.cpsr.carry);
     }
 }
