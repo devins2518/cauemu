@@ -258,4 +258,14 @@ mod test {
     fn test_fields() {
         assert_eq!(Field::Flags.mask(), 0x00FFFFFF)
     }
+
+    /*
+    #[test]
+    fn test_move() {
+        let mut cpu = Arm7TDMI::new();
+        let rd = Operand::Register(&mut cpu.registers[0]);
+        cpu.mov(rd, Operand::Immediate(0x100));
+        assert_eq!(cpu.registers[0], 0x100);
+    }
+    */
 }
