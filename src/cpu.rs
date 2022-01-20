@@ -1,3 +1,4 @@
+use modular_bitfield::prelude::*;
 use std::ptr::NonNull;
 
 pub struct Arm7TDMI {
@@ -90,17 +91,19 @@ impl Arm7TDMI {
     }
 }
 
+#[bitfield]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 struct Psr {
     signed: bool,
     zero: bool,
     carry: bool,
     overflow: bool,
+    #[skip]
+    __: B21,
     irq: bool,
     fiq: bool,
-    state: bool,
-    // Really a u4
-    mode: u8,
+    arm: bool,
+    mode: B4,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -139,10 +142,9 @@ impl<'a> Operand<'a> {
             Operand::ArithShiftR(v, r) => (v as i32 >> r) as u32,
             Operand::RotateRReg(v, r) => v.rotate_right(r),
             Operand::RotateRExt(r) => {
-                let c = &mut cpu.cpsr.carry;
                 let one = r & 0x1;
-                let r = ((*c as u32) << 31) | (r >> 1);
-                *c = one == 1;
+                let r = ((cpu.cpsr.carry() as u32) << 31) | (r >> 1);
+                cpu.cpsr.set_carry(one == 1);
                 r
             }
         }
@@ -170,10 +172,26 @@ enum Field {
     Control,
 }
 
+impl Field {
+    fn mask(&self) -> u32 {
+        !(0xFF << self.offset())
+    }
+
+    fn offset(&self) -> u32 {
+        match self {
+            Field::Flags => 24,
+            Field::Status => 16,
+            Field::Extension => 8,
+            Field::Control => 0,
+        }
+    }
+}
+
 // Instruction set implementation
 /// The ARM7TDMI implements the ARMv4T instruction set. Notable features are the 16 bit Thumb
 /// instruction set, three stage pipeline, and the lack of a 26 bit addressing mode.
 impl Arm7TDMI {
+    /// Move the value of op2 into rd.
     fn mov(&mut self, rd: Operand, op2: Operand) {
         if let Operand::Register(r) = rd {
             let val = op2.get(self);
@@ -182,6 +200,8 @@ impl Arm7TDMI {
             unsafe { std::hint::unreachable_unchecked() }
         }
     }
+
+    /// Move the negated contents of op2 into rd.
     fn mvn(&mut self, rd: Operand, op2: Operand) {
         if let Operand::Register(r) = rd {
             let val = op2.get(self);
@@ -193,17 +213,31 @@ impl Arm7TDMI {
 
     /// Move the contents of the CPSR or SPSR into a register.
     fn mrs(&mut self, rd: Operand, psr: PsrArg) {
+        let psr = if let PsrArg::Cpsr = psr {
+            u32::from_le_bytes(self.cpsr.into_bytes())
+        } else {
+            // Safety: Calling MRS with SPSR in User mode is undefined. We can just crash
+            // here.
+            u32::from_le_bytes(unsafe { self.spsr.unwrap_unchecked().as_ref().into_bytes() })
+        };
         if let Operand::Register(r) = rd {
-            let psr = if let PsrArg::Cpsr = psr {
-                self.cpsr
-            } else {
-                // Safety: Calling MRS with SPSR in User mode is undefined. We can just crash
-                // here.
-                unsafe { *self.spsr.unwrap_unchecked().as_ref() }
-            };
+            *r = psr;
         } else {
             unsafe { std::hint::unreachable_unchecked() }
         }
+    }
+
+    /// Move the contents of a register to a PSR field
+    fn msr(&mut self, psr: PsrArg, field: Field, op2: Operand) {
+        let val = op2.get(self);
+        let mask = field.mask();
+        let psr = match psr {
+            PsrArg::Cpsr => &mut self.cpsr,
+            PsrArg::Spsr => unsafe { self.spsr.unwrap().as_mut() },
+        };
+        *psr = Psr::from_bytes(
+            ((u32::from_be_bytes(psr.into_bytes()) & mask) | (val << field.offset())).to_le_bytes(),
+        );
     }
 }
 
@@ -215,8 +249,13 @@ mod test {
     fn test_operands() {
         let op = Operand::RotateRExt(0b10100101100011010011010001101001);
         let mut cpu = Arm7TDMI::new();
-        cpu.cpsr.carry = false;
+        cpu.cpsr.set_carry(false);
         assert_eq!(op.get(&mut cpu), 0b01010010110001101001101000110100);
-        assert!(cpu.cpsr.carry);
+        assert!(cpu.cpsr.carry());
+    }
+
+    #[test]
+    fn test_fields() {
+        assert_eq!(Field::Flags.mask(), 0x00FFFFFF)
     }
 }
