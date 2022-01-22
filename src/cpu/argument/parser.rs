@@ -1,10 +1,10 @@
-use crate::cpu::argument::types::{
-    AluOp2, AluOp2Imm, AluOp2Reg, AluOpcode, Condition, Operand, PsrArg, ShiftType,
-};
-
-use super::{
-    super::Arm7TDMI,
-    types::{AluInstr, MovInstr, MrsInstr, MsrInstr},
+use super::alu::{AluInstr, MovInstr, MrsInstr, MsrInstr};
+use crate::cpu::{
+    argument::{
+        alu::{AluOp2, AluOp2Imm, AluOp2Reg, AluOpcode},
+        types::{Condition, Operand, PsrArg, ShiftType},
+    },
+    Arm7TDMI,
 };
 
 pub fn parse_mov(instr: u32, cpu: &Arm7TDMI) -> MovInstr {
