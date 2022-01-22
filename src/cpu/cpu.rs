@@ -208,35 +208,3 @@ impl Arm7TDMI {
         self.set_psr(Psr::from_bytes(psr), instr.psr);
     }
 }
-
-#[cfg(test)]
-mod test {
-    /*
-    #[test]
-    fn test_move() {
-        let mut cpu = Arm7TDMI::new();
-        cpu.mov(
-            Operand::Register(&mut cpu.registers[0]),
-            Operand::Immediate(0x100),
-        );
-        assert_eq!(cpu.registers[0], 0x100);
-        cpu.mvn(
-            Operand::Register(&mut cpu.registers[0]),
-            Operand::Immediate(0x00F),
-        );
-        assert_eq!(cpu.registers[0], 0xFFFFFFF0);
-        cpu.mrs(Operand::Register(&mut cpu.registers[0]), PsrArg::Cpsr);
-        assert_eq!(cpu.registers[0], 0x0);
-        cpu.mov(
-            Operand::Register(&mut cpu.registers[0]),
-            Operand::Immediate(0x80),
-        );
-        cpu.msr(
-            PsrArg::Cpsr,
-            Field::Flags,
-            Operand::Register(&mut cpu.registers[0]),
-        );
-        assert_eq!(cpu.cpsr.carry(), true);
-    }
-    */
-}
