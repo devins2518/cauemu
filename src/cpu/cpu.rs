@@ -136,7 +136,15 @@ impl Arm7TDMI {
         }
     }
 
-    fn arith_flags(&mut self, val: u32, reg: u32, res: u32) {
+    fn log_flags(&mut self, shifted: u32, res: u32, nonzero: bool) {
+        self.cpsr.set_zero(res == 0);
+        self.cpsr.set_signed((res >> 31) == 1);
+        if nonzero {
+            self.cpsr.set_carry((shifted >> 31) == 1);
+        }
+    }
+
+    fn arith_flags(&mut self, reg: u32, val: u32, res: u32) {
         self.cpsr.set_zero(res == 0);
         self.cpsr.set_signed((res >> 31) == 1);
         self.cpsr.set_carry(res < val || res < reg);
@@ -176,59 +184,85 @@ impl Arm7TDMI {
     /// Move the value of op2 into rd.
     fn mov(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, val);
+        let shifted = instr.op2.get(self, instr.s);
+        let res = shifted;
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.log_flags(shifted, res, instr.op2.nonzero());
+        }
     }
 
     /// Move the negated contents of op2 into rd.
     fn mvn(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, !val);
+        let shifted = instr.op2.get(self, instr.s);
+        let res = !shifted;
+        self.set_reg_rt(instr.rd, shifted);
+        if instr.s && instr.rd != 15 {
+            self.log_flags(shifted, res, instr.op2.nonzero());
+        }
     }
 
     /// Set rd = rn | op2.
     fn orr(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) | val);
+        let shifted = instr.op2.get(self, instr.s);
+        let res = self.get_reg_rt(instr.rn) | shifted;
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.log_flags(shifted, res, instr.op2.nonzero());
+        }
     }
 
     /// Set rd = rn ^ op2.
     fn eor(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) ^ val);
+        let shifted = instr.op2.get(self, instr.s);
+        let res = self.get_reg_rt(instr.rn) ^ shifted;
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.log_flags(shifted, res, instr.op2.nonzero());
+        }
     }
 
     /// Set rd = rn & op2.
     fn and(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) & val);
+        let shifted = instr.op2.get(self, instr.s);
+        let res = self.get_reg_rt(instr.rn) & shifted;
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.log_flags(shifted, res, instr.op2.nonzero());
+        }
     }
 
     /// Set rd = rn & !op2.
     fn bic(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) & !val);
+        let shifted = instr.op2.get(self, instr.s);
+        let res = self.get_reg_rt(instr.rn) & !shifted;
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.log_flags(shifted, res, instr.op2.nonzero());
+        }
     }
 
     fn tst(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        let val = instr.op2.get(self, true);
-        let val = self.get_reg_rt(instr.rn) & val;
-        self.cpsr.set_zero(val == 0);
-        self.cpsr.set_signed((val >> 31) == 1);
+        let shifted = instr.op2.get(self, true);
+        let res = self.get_reg_rt(instr.rn) & shifted;
+        if instr.s && instr.rd != 15 {
+            self.log_flags(shifted, res, instr.op2.nonzero());
+        }
     }
 
     fn teq(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        let val = instr.op2.get(self, true);
-        let val = self.get_reg_rt(instr.rn) == val;
-        self.cpsr.set_zero(val);
-        self.cpsr.set_signed(val);
+        let shifted = instr.op2.get(self, true);
+        let res = self.get_reg_rt(instr.rn) ^ shifted;
+        if instr.s && instr.rd != 15 {
+            self.log_flags(shifted, res, instr.op2.nonzero());
+        }
     }
 
     fn add(&mut self, instr: u32) {
@@ -238,7 +272,7 @@ impl Arm7TDMI {
         let res = reg + val;
         self.set_reg_rt(instr.rd, res);
         if instr.s && instr.rd != 15 {
-            self.arith_flags(val, reg, res);
+            self.arith_flags(reg, val, res);
         }
     }
 
@@ -249,7 +283,7 @@ impl Arm7TDMI {
         let res = self.get_reg_rt(instr.rn) + val + u32::from(self.cpsr.carry());
         self.set_reg_rt(instr.rd, res);
         if instr.s && instr.rd != 15 {
-            self.arith_flags(val, reg, res);
+            self.arith_flags(reg, val, res);
         }
     }
 
@@ -260,7 +294,7 @@ impl Arm7TDMI {
         let res = self.get_reg_rt(instr.rn) - val;
         self.set_reg_rt(instr.rd, res);
         if instr.s && instr.rd != 15 {
-            self.arith_flags(val, reg, res);
+            self.arith_flags(reg, val, res);
         }
     }
 
@@ -271,7 +305,7 @@ impl Arm7TDMI {
         let res = (self.get_reg_rt(instr.rn) - val) + (u32::from(self.cpsr.carry()) - 1);
         self.set_reg_rt(instr.rd, res);
         if instr.s && instr.rd != 15 {
-            self.arith_flags(val, reg, res);
+            self.arith_flags(reg, val, res);
         }
     }
 
@@ -282,7 +316,7 @@ impl Arm7TDMI {
         let res = val - self.get_reg_rt(instr.rn);
         self.set_reg_rt(instr.rd, res);
         if instr.s && instr.rd != 15 {
-            self.arith_flags(val, reg, res);
+            self.arith_flags(reg, val, res);
         }
     }
 
@@ -293,7 +327,7 @@ impl Arm7TDMI {
         let res = (val - self.get_reg_rt(instr.rn)) + (u32::from(self.cpsr.carry()) - 1);
         self.set_reg_rt(instr.rd, res);
         if instr.s && instr.rd != 15 {
-            self.arith_flags(val, reg, res);
+            self.arith_flags(reg, val, res);
         }
     }
 
@@ -303,7 +337,7 @@ impl Arm7TDMI {
         let val = instr.op2.get(self, instr.s);
         let res = self.get_reg_rt(instr.rn) - val;
         if instr.s && instr.rd != 15 {
-            self.arith_flags(val, reg, res);
+            self.arith_flags(reg, val, res);
         }
     }
 
@@ -313,7 +347,7 @@ impl Arm7TDMI {
         let val = instr.op2.get(self, instr.s);
         let res = reg + val;
         if instr.s && instr.rd != 15 {
-            self.arith_flags(val, reg, res);
+            self.arith_flags(reg, val, res);
         }
     }
 

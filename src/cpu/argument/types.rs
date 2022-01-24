@@ -81,8 +81,8 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn get(self, cpu: &mut Arm7TDMI, set_flag: bool) -> u32 {
-        match self {
+    pub fn get(&self, cpu: &mut Arm7TDMI, set_flag: bool) -> u32 {
+        match *self {
             Operand::RotateRImm(v, i) => (v as u32).rotate_right(i as u32 * 2),
             Operand::LogShiftLReg(v, n) => cpu.get_reg_rt(v) << cpu.get_reg_rt(n),
             Operand::LogShiftLImm(v, i) => cpu.get_reg_rt(v) << i,
@@ -113,6 +113,14 @@ impl Operand {
                 }
                 ((cpu.cpsr.carry() as u32) << 31) | (reg >> 1)
             }
+        }
+    }
+
+    pub fn nonzero(&self) -> bool {
+        // Rs != 00h
+        match self {
+            Operand::LogShiftLImm(_, 0) | Operand::LogShiftLReg(_, 0) => true,
+            _ => false,
         }
     }
 }
