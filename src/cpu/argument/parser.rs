@@ -1,7 +1,4 @@
-use super::alu::{
-    AluInstr, AndInstr, BicInstr, EorInstr, MovInstr, MrsInstr, MsrInstr, OrrInstr, TeqInstr,
-    TstInstr,
-};
+use super::alu::{AluInstr, MrsInstr, MsrInstr};
 use crate::cpu::{
     argument::{
         alu::{AluOp2, AluOp2Imm, AluOp2Reg, AluOpcode},
@@ -9,87 +6,6 @@ use crate::cpu::{
     },
     Arm7TDMI,
 };
-
-pub fn parse_mov(instr: u32, cpu: &Arm7TDMI) -> MovInstr {
-    let alu = parse_alu(instr);
-    debug_assert_eq!(alu.opcode, AluOpcode::Mov);
-    debug_assert_eq!(alu.rn, 0x0);
-    let op2 = Operand::from(alu.op2);
-    MovInstr {
-        cond: alu.cond,
-        s: alu.set_conditions,
-        register: alu.rd,
-        op2,
-    }
-}
-
-pub fn parse_orr(instr: u32) -> OrrInstr {
-    let alu = parse_alu(instr);
-
-    OrrInstr {
-        cond: alu.cond,
-        s: alu.set_conditions,
-        rd: alu.rd,
-        rn: alu.rn,
-        op2: Operand::from(alu.op2),
-    }
-}
-
-pub fn parse_eor(instr: u32) -> EorInstr {
-    let alu = parse_alu(instr);
-
-    EorInstr {
-        cond: alu.cond,
-        s: alu.set_conditions,
-        rd: alu.rd,
-        rn: alu.rn,
-        op2: Operand::from(alu.op2),
-    }
-}
-
-pub fn parse_and(instr: u32) -> AndInstr {
-    let alu = parse_alu(instr);
-
-    AndInstr {
-        cond: alu.cond,
-        s: alu.set_conditions,
-        rd: alu.rd,
-        rn: alu.rn,
-        op2: Operand::from(alu.op2),
-    }
-}
-
-pub fn parse_bic(instr: u32) -> BicInstr {
-    let alu = parse_alu(instr);
-
-    BicInstr {
-        cond: alu.cond,
-        s: alu.set_conditions,
-        rd: alu.rd,
-        rn: alu.rn,
-        op2: Operand::from(alu.op2),
-    }
-}
-
-pub fn parse_tst(instr: u32) -> TstInstr {
-    let alu = parse_alu(instr);
-
-    TstInstr {
-        cond: alu.cond,
-        rn: alu.rn,
-        op2: Operand::from(alu.op2),
-    }
-}
-
-pub fn parse_teq(instr: u32) -> TeqInstr {
-    let alu = parse_alu(instr);
-
-    TeqInstr {
-        cond: alu.cond,
-        rn: alu.rn,
-        op2: Operand::from(alu.op2),
-    }
-}
 
 pub fn parse_mrs(instr: u32) -> MrsInstr {
     let bytes = instr.to_le_bytes();
@@ -150,13 +66,13 @@ pub fn parse_msr(instr: u32, cpu: &Arm7TDMI) -> MsrInstr {
     }
 }
 
-fn parse_alu(instr: u32) -> AluInstr {
+pub fn parse_alu(instr: u32) -> AluInstr {
     let bytes = instr.to_le_bytes();
     let cond = Condition::from(bytes[0] >> 4);
     debug_assert_eq!(bytes[0] & 0x0C, 0x00);
     let immediate = ((bytes[0] & 0x02) >> 1) == 1;
     let opcode = AluOpcode::from(((bytes[1] & 0xE0) >> 5) | ((bytes[0] & 0x01) << 3));
-    let set_conditions = ((bytes[1] & 0x10) >> 4) == 1;
+    let s = ((bytes[1] & 0x10) >> 4) == 1;
     let rn = bytes[1] & 0x0F;
     let rd = (bytes[2] & 0xF0) >> 4;
     let op2 = if immediate {
@@ -184,9 +100,9 @@ fn parse_alu(instr: u32) -> AluInstr {
         cond,
         immediate,
         opcode,
-        set_conditions,
+        s,
         rn,
         rd,
-        op2,
+        op2: Operand::from(op2),
     }
 }

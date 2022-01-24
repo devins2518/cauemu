@@ -1,7 +1,5 @@
 use super::argument::{
-    parser::{
-        parse_and, parse_bic, parse_mov, parse_mrs, parse_msr, parse_orr, parse_teq, parse_tst,
-    },
+    parser::{parse_alu, parse_mrs, parse_msr},
     types::PsrArg,
 };
 use modular_bitfield::prelude::*;
@@ -170,44 +168,44 @@ pub(super) enum Mode {
 impl Arm7TDMI {
     /// Move the value of op2 into rd.
     fn mov(&mut self, instr: u32) {
-        let instr = parse_mov(instr, self);
+        let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.register, val);
+        self.set_reg_rt(instr.rd, val);
     }
 
     /// Move the negated contents of op2 into rd.
     fn mvn(&mut self, instr: u32) {
-        let instr = parse_mov(instr, self);
+        let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.register, !val);
+        self.set_reg_rt(instr.rd, !val);
     }
 
     fn orr(&mut self, instr: u32) {
-        let instr = parse_orr(instr);
+        let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
         self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) | val);
     }
 
     fn eor(&mut self, instr: u32) {
-        let instr = parse_orr(instr);
+        let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
         self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) ^ val);
     }
 
     fn and(&mut self, instr: u32) {
-        let instr = parse_and(instr);
+        let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
         self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) & val);
     }
 
     fn bic(&mut self, instr: u32) {
-        let instr = parse_bic(instr);
+        let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
         self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) & !val);
     }
 
     fn tst(&mut self, instr: u32) {
-        let instr = parse_tst(instr);
+        let instr = parse_alu(instr);
         let val = instr.op2.get(self, true);
         let val = self.get_reg_rt(instr.rn) & val;
         self.cpsr.set_zero(val == 0);
@@ -215,7 +213,8 @@ impl Arm7TDMI {
     }
 
     fn teq(&mut self, instr: u32) {
-        let instr = parse_teq(instr);
+        let instr = parse_alu(instr);
+        // debug_assert_eq!(instr.opcode)
         let val = instr.op2.get(self, true);
         let val = self.get_reg_rt(instr.rn) == val;
         self.cpsr.set_zero(val);

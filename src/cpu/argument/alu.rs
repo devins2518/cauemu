@@ -1,17 +1,17 @@
 use super::types::{Condition, Operand, PsrArg, Register, ShiftType};
 
-pub(super) struct AluInstr {
+pub struct AluInstr {
     pub cond: Condition,
     pub immediate: bool,
     pub opcode: AluOpcode,
-    pub set_conditions: bool,
+    pub s: bool,
     pub rn: Register,
     pub rd: Register,
-    pub op2: AluOp2,
+    pub op2: Operand,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum AluOpcode {
+pub enum AluOpcode {
     And,
     Eor,
     Sub,
@@ -114,14 +114,6 @@ pub(super) struct AluOp2Imm {
     pub imm: u8,
 }
 
-/// Instruction that moves val into register.
-pub struct MovInstr {
-    pub cond: Condition,
-    pub s: bool,
-    pub register: Register,
-    pub op2: Operand,
-}
-
 /// Instruction that moves PSR into register.
 pub struct MrsInstr {
     pub cond: Condition,
@@ -138,54 +130,4 @@ pub struct MsrInstr {
     pub x: bool,
     pub c: bool,
     pub val: u32,
-}
-
-/// Instruction that sets rd = rn | op2.
-pub struct OrrInstr {
-    pub cond: Condition,
-    pub s: bool,
-    pub rd: Register,
-    pub rn: Register,
-    pub op2: Operand,
-}
-
-/// Instruction that sets rd = rn ^ op2.
-pub struct EorInstr {
-    pub cond: Condition,
-    pub s: bool,
-    pub rd: Register,
-    pub rn: Register,
-    pub op2: Operand,
-}
-
-/// Instruction that sets rd = rn & op2.
-pub struct AndInstr {
-    pub cond: Condition,
-    pub s: bool,
-    pub rd: Register,
-    pub rn: Register,
-    pub op2: Operand,
-}
-
-/// Instruction that sets rd = rn & !op2.
-pub struct BicInstr {
-    pub cond: Condition,
-    pub s: bool,
-    pub rd: Register,
-    pub rn: Register,
-    pub op2: Operand,
-}
-
-/// Instruction that sets flags based on rn & op2.
-pub struct TstInstr {
-    pub cond: Condition,
-    pub rn: Register,
-    pub op2: Operand,
-}
-
-/// Instruction that sets flags based on rn ^ op2.
-pub struct TeqInstr {
-    pub cond: Condition,
-    pub rn: Register,
-    pub op2: Operand,
 }
