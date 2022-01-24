@@ -181,6 +181,8 @@ pub(super) enum Mode {
 /// The ARM7TDMI implements the ARMv4T instruction set. Notable features are the 16 bit Thumb
 /// instruction set, three stage pipeline, and the lack of a 26 bit addressing mode.
 impl Arm7TDMI {
+    /// Logical ALU
+
     /// Move the value of op2 into rd.
     fn mov(&mut self, instr: u32) {
         let instr = parse_alu(instr);
@@ -247,6 +249,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Test rn & op2
     fn tst(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let shifted = instr.op2.get(self, true);
@@ -256,6 +259,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Test rn ^ op2
     fn teq(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let shifted = instr.op2.get(self, true);
@@ -265,6 +269,9 @@ impl Arm7TDMI {
         }
     }
 
+    /// Arithmetic ALU
+
+    /// Set rd = rn + op2
     fn add(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let reg = self.get_reg_rt(instr.rn);
@@ -276,6 +283,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Set rd = rn + op2 + carry
     fn adc(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let reg = self.get_reg_rt(instr.rn);
@@ -287,6 +295,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Set rd = rn - op2
     fn sub(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let reg = self.get_reg_rt(instr.rn);
@@ -298,6 +307,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Set rd = rn - op2 + carry - 1
     fn sbc(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let reg = self.get_reg_rt(instr.rn);
@@ -309,6 +319,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Set rd = op2 - rn
     fn rsb(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let reg = self.get_reg_rt(instr.rn);
@@ -320,6 +331,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Set rd = op2 - rn + carry - 1
     fn rsc(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let reg = self.get_reg_rt(instr.rn);
@@ -331,6 +343,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Test rn - op2
     fn cmp(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let reg = self.get_reg_rt(instr.rn);
@@ -341,6 +354,7 @@ impl Arm7TDMI {
         }
     }
 
+    /// Test rn + op2
     fn cmn(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let reg = self.get_reg_rt(instr.rn);
