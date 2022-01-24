@@ -180,24 +180,28 @@ impl Arm7TDMI {
         self.set_reg_rt(instr.rd, !val);
     }
 
+    /// Set rd = rn | op2.
     fn orr(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
         self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) | val);
     }
 
+    /// Set rd = rn ^ op2.
     fn eor(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
         self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) ^ val);
     }
 
+    /// Set rd = rn & op2.
     fn and(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
         self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) & val);
     }
 
+    /// Set rd = rn & !op2.
     fn bic(&mut self, instr: u32) {
         let instr = parse_alu(instr);
         let val = instr.op2.get(self, instr.s);
@@ -217,6 +221,67 @@ impl Arm7TDMI {
         // debug_assert_eq!(instr.opcode)
         let val = instr.op2.get(self, true);
         let val = self.get_reg_rt(instr.rn) == val;
+        self.cpsr.set_zero(val);
+        self.cpsr.set_signed(val);
+    }
+
+    fn add(&mut self, instr: u32) {
+        let instr = parse_alu(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) + val);
+    }
+
+    fn adc(&mut self, instr: u32) {
+        let instr = parse_alu(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(
+            instr.rd,
+            self.get_reg_rt(instr.rn) + val + u32::from(self.cpsr.carry()),
+        );
+    }
+
+    fn sub(&mut self, instr: u32) {
+        let instr = parse_alu(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) - val);
+    }
+
+    fn sbc(&mut self, instr: u32) {
+        let instr = parse_alu(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(
+            instr.rd,
+            (self.get_reg_rt(instr.rn) - val) + (u32::from(self.cpsr.carry()) - 1),
+        );
+    }
+
+    fn rsb(&mut self, instr: u32) {
+        let instr = parse_alu(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(instr.rd, val - self.get_reg_rt(instr.rn));
+    }
+
+    fn rsc(&mut self, instr: u32) {
+        let instr = parse_alu(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(
+            instr.rd,
+            (val - self.get_reg_rt(instr.rn)) + (u32::from(self.cpsr.carry()) - 1),
+        );
+    }
+
+    fn cmp(&mut self, instr: u32) {
+        let instr = parse_alu(instr);
+        let val = instr.op2.get(self, instr.s);
+        let val = self.get_reg_rt(instr.rn) - val;
+        self.cpsr.set_zero(val);
+        self.cpsr.set_signed(val);
+    }
+
+    fn cmn(&mut self, instr: u32) {
+        let instr = parse_alu(instr);
+        let val = instr.op2.get(self, instr.s);
+        let val = self.get_reg_rt(instr.rn) + val;
         self.cpsr.set_zero(val);
         self.cpsr.set_signed(val);
     }
