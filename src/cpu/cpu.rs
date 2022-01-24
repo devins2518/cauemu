@@ -135,6 +135,13 @@ impl Arm7TDMI {
             PsrArg::Spsr => unsafe { *self.spsr.unwrap().as_mut() = psr },
         }
     }
+
+    fn arith_flags(&mut self, val: u32, reg: u32, res: u32) {
+        self.cpsr.set_zero(res == 0);
+        self.cpsr.set_signed((res >> 31) == 1);
+        self.cpsr.set_carry(res < val || res < reg);
+        self.cpsr.set_overflow(reg >> 31 != res >> 31)
+    }
 }
 
 #[bitfield]
@@ -218,7 +225,6 @@ impl Arm7TDMI {
 
     fn teq(&mut self, instr: u32) {
         let instr = parse_alu(instr);
-        // debug_assert_eq!(instr.opcode)
         let val = instr.op2.get(self, true);
         let val = self.get_reg_rt(instr.rn) == val;
         self.cpsr.set_zero(val);
@@ -227,63 +233,88 @@ impl Arm7TDMI {
 
     fn add(&mut self, instr: u32) {
         let instr = parse_alu(instr);
+        let reg = self.get_reg_rt(instr.rn);
         let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) + val);
+        let res = reg + val;
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.arith_flags(val, reg, res);
+        }
     }
 
     fn adc(&mut self, instr: u32) {
         let instr = parse_alu(instr);
+        let reg = self.get_reg_rt(instr.rn);
         let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(
-            instr.rd,
-            self.get_reg_rt(instr.rn) + val + u32::from(self.cpsr.carry()),
-        );
+        let res = self.get_reg_rt(instr.rn) + val + u32::from(self.cpsr.carry());
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.arith_flags(val, reg, res);
+        }
     }
 
     fn sub(&mut self, instr: u32) {
         let instr = parse_alu(instr);
+        let reg = self.get_reg_rt(instr.rn);
         let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) - val);
+        let res = self.get_reg_rt(instr.rn) - val;
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.arith_flags(val, reg, res);
+        }
     }
 
     fn sbc(&mut self, instr: u32) {
         let instr = parse_alu(instr);
+        let reg = self.get_reg_rt(instr.rn);
         let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(
-            instr.rd,
-            (self.get_reg_rt(instr.rn) - val) + (u32::from(self.cpsr.carry()) - 1),
-        );
+        let res = (self.get_reg_rt(instr.rn) - val) + (u32::from(self.cpsr.carry()) - 1);
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.arith_flags(val, reg, res);
+        }
     }
 
     fn rsb(&mut self, instr: u32) {
         let instr = parse_alu(instr);
+        let reg = self.get_reg_rt(instr.rn);
         let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(instr.rd, val - self.get_reg_rt(instr.rn));
+        let res = val - self.get_reg_rt(instr.rn);
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.arith_flags(val, reg, res);
+        }
     }
 
     fn rsc(&mut self, instr: u32) {
         let instr = parse_alu(instr);
+        let reg = self.get_reg_rt(instr.rn);
         let val = instr.op2.get(self, instr.s);
-        self.set_reg_rt(
-            instr.rd,
-            (val - self.get_reg_rt(instr.rn)) + (u32::from(self.cpsr.carry()) - 1),
-        );
+        let res = (val - self.get_reg_rt(instr.rn)) + (u32::from(self.cpsr.carry()) - 1);
+        self.set_reg_rt(instr.rd, res);
+        if instr.s && instr.rd != 15 {
+            self.arith_flags(val, reg, res);
+        }
     }
 
     fn cmp(&mut self, instr: u32) {
         let instr = parse_alu(instr);
+        let reg = self.get_reg_rt(instr.rn);
         let val = instr.op2.get(self, instr.s);
-        let val = self.get_reg_rt(instr.rn) - val;
-        self.cpsr.set_zero(val);
-        self.cpsr.set_signed(val);
+        let res = self.get_reg_rt(instr.rn) - val;
+        if instr.s && instr.rd != 15 {
+            self.arith_flags(val, reg, res);
+        }
     }
 
     fn cmn(&mut self, instr: u32) {
         let instr = parse_alu(instr);
+        let reg = self.get_reg_rt(instr.rn);
         let val = instr.op2.get(self, instr.s);
-        let val = self.get_reg_rt(instr.rn) + val;
-        self.cpsr.set_zero(val);
-        self.cpsr.set_signed(val);
+        let res = reg + val;
+        if instr.s && instr.rd != 15 {
+            self.arith_flags(val, reg, res);
+        }
     }
 
     /// Move the contents of the CPSR or SPSR into a register.
