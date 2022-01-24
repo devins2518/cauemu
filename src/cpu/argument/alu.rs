@@ -1,12 +1,12 @@
-use super::types::{Condition, Operand, PsrArg, ShiftType};
+use super::types::{Condition, Operand, PsrArg, Register, ShiftType};
 
 pub(super) struct AluInstr {
     pub cond: Condition,
     pub immediate: bool,
     pub opcode: AluOpcode,
     pub set_conditions: bool,
-    pub rn: u8,
-    pub rd: u8,
+    pub rn: Register,
+    pub rd: Register,
     pub op2: AluOp2,
 }
 
@@ -59,12 +59,54 @@ pub(super) enum AluOp2 {
     Immediate(AluOp2Imm),
 }
 
+impl From<AluOp2> for Operand {
+    fn from(s: AluOp2) -> Self {
+        match s {
+            AluOp2::Register(r) => match r.shift_type {
+                ShiftType::LogShiftLeft => {
+                    if r.by_reg {
+                        Operand::LogShiftLReg(r.rm, r.shift)
+                    } else {
+                        Operand::LogShiftLImm(r.rm, r.shift)
+                    }
+                }
+                ShiftType::LogShiftRight => {
+                    if r.by_reg {
+                        Operand::LogShiftRReg(r.rm, r.shift)
+                    } else {
+                        Operand::LogShiftRImm(r.rm, r.shift)
+                    }
+                }
+                ShiftType::ArithShiftRight => {
+                    if r.by_reg {
+                        Operand::ArithShiftReg(r.rm, r.shift)
+                    } else {
+                        Operand::ArithShiftImm(r.rm, r.shift)
+                    }
+                }
+                ShiftType::RotateRight => {
+                    if r.by_reg {
+                        Operand::RotateRReg(r.rm, r.shift)
+                    } else {
+                        if r.shift != 0 {
+                            Operand::RotateRRegImm(r.rm, r.shift)
+                        } else {
+                            Operand::RotateRExt(r.rm)
+                        }
+                    }
+                }
+            },
+            AluOp2::Immediate(i) => Operand::RotateRImm(i.imm, i.shift),
+        }
+    }
+}
+
 pub(super) struct AluOp2Reg {
     /// Either a shift amount or a register value used to shift.
     pub shift: u8,
     pub shift_type: ShiftType,
     pub by_reg: bool,
-    pub rm: u8,
+    pub rm: Register,
 }
 
 pub(super) struct AluOp2Imm {
@@ -76,7 +118,7 @@ pub(super) struct AluOp2Imm {
 pub struct MovInstr {
     pub cond: Condition,
     pub s: bool,
-    pub register: u8,
+    pub register: Register,
     pub op2: Operand,
 }
 
@@ -84,7 +126,7 @@ pub struct MovInstr {
 pub struct MrsInstr {
     pub cond: Condition,
     pub psr: PsrArg,
-    pub register: u8,
+    pub register: Register,
 }
 
 /// Instruction that moves val into PSR_field.
@@ -96,4 +138,54 @@ pub struct MsrInstr {
     pub x: bool,
     pub c: bool,
     pub val: u32,
+}
+
+/// Instruction that sets rd = rn | op2.
+pub struct OrrInstr {
+    pub cond: Condition,
+    pub s: bool,
+    pub rd: Register,
+    pub rn: Register,
+    pub op2: Operand,
+}
+
+/// Instruction that sets rd = rn ^ op2.
+pub struct EorInstr {
+    pub cond: Condition,
+    pub s: bool,
+    pub rd: Register,
+    pub rn: Register,
+    pub op2: Operand,
+}
+
+/// Instruction that sets rd = rn & op2.
+pub struct AndInstr {
+    pub cond: Condition,
+    pub s: bool,
+    pub rd: Register,
+    pub rn: Register,
+    pub op2: Operand,
+}
+
+/// Instruction that sets rd = rn & !op2.
+pub struct BicInstr {
+    pub cond: Condition,
+    pub s: bool,
+    pub rd: Register,
+    pub rn: Register,
+    pub op2: Operand,
+}
+
+/// Instruction that sets flags based on rn & op2.
+pub struct TstInstr {
+    pub cond: Condition,
+    pub rn: Register,
+    pub op2: Operand,
+}
+
+/// Instruction that sets flags based on rn ^ op2.
+pub struct TeqInstr {
+    pub cond: Condition,
+    pub rn: Register,
+    pub op2: Operand,
 }

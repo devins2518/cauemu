@@ -1,4 +1,7 @@
-use super::alu::{AluInstr, MovInstr, MrsInstr, MsrInstr};
+use super::alu::{
+    AluInstr, AndInstr, BicInstr, EorInstr, MovInstr, MrsInstr, MsrInstr, OrrInstr, TeqInstr,
+    TstInstr,
+};
 use crate::cpu::{
     argument::{
         alu::{AluOp2, AluOp2Imm, AluOp2Reg, AluOpcode},
@@ -17,6 +20,74 @@ pub fn parse_mov(instr: u32, cpu: &Arm7TDMI) -> MovInstr {
         s: alu.set_conditions,
         register: alu.rd,
         op2,
+    }
+}
+
+pub fn parse_orr(instr: u32) -> OrrInstr {
+    let alu = parse_alu(instr);
+
+    OrrInstr {
+        cond: alu.cond,
+        s: alu.set_conditions,
+        rd: alu.rd,
+        rn: alu.rn,
+        op2: Operand::from(alu.op2),
+    }
+}
+
+pub fn parse_eor(instr: u32) -> EorInstr {
+    let alu = parse_alu(instr);
+
+    EorInstr {
+        cond: alu.cond,
+        s: alu.set_conditions,
+        rd: alu.rd,
+        rn: alu.rn,
+        op2: Operand::from(alu.op2),
+    }
+}
+
+pub fn parse_and(instr: u32) -> AndInstr {
+    let alu = parse_alu(instr);
+
+    AndInstr {
+        cond: alu.cond,
+        s: alu.set_conditions,
+        rd: alu.rd,
+        rn: alu.rn,
+        op2: Operand::from(alu.op2),
+    }
+}
+
+pub fn parse_bic(instr: u32) -> BicInstr {
+    let alu = parse_alu(instr);
+
+    BicInstr {
+        cond: alu.cond,
+        s: alu.set_conditions,
+        rd: alu.rd,
+        rn: alu.rn,
+        op2: Operand::from(alu.op2),
+    }
+}
+
+pub fn parse_tst(instr: u32) -> TstInstr {
+    let alu = parse_alu(instr);
+
+    TstInstr {
+        cond: alu.cond,
+        rn: alu.rn,
+        op2: Operand::from(alu.op2),
+    }
+}
+
+pub fn parse_teq(instr: u32) -> TeqInstr {
+    let alu = parse_alu(instr);
+
+    TeqInstr {
+        cond: alu.cond,
+        rn: alu.rn,
+        op2: Operand::from(alu.op2),
     }
 }
 

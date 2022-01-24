@@ -1,5 +1,7 @@
 use super::argument::{
-    parser::{parse_mov, parse_mrs, parse_msr},
+    parser::{
+        parse_and, parse_bic, parse_mov, parse_mrs, parse_msr, parse_orr, parse_teq, parse_tst,
+    },
     types::PsrArg,
 };
 use modular_bitfield::prelude::*;
@@ -178,6 +180,46 @@ impl Arm7TDMI {
         let instr = parse_mov(instr, self);
         let val = instr.op2.get(self, instr.s);
         self.set_reg_rt(instr.register, !val);
+    }
+
+    fn orr(&mut self, instr: u32) {
+        let instr = parse_orr(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) | val);
+    }
+
+    fn eor(&mut self, instr: u32) {
+        let instr = parse_orr(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) ^ val);
+    }
+
+    fn and(&mut self, instr: u32) {
+        let instr = parse_and(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) & val);
+    }
+
+    fn bic(&mut self, instr: u32) {
+        let instr = parse_bic(instr);
+        let val = instr.op2.get(self, instr.s);
+        self.set_reg_rt(instr.rd, self.get_reg_rt(instr.rn) & !val);
+    }
+
+    fn tst(&mut self, instr: u32) {
+        let instr = parse_tst(instr);
+        let val = instr.op2.get(self, true);
+        let val = self.get_reg_rt(instr.rn) & val;
+        self.cpsr.set_zero(val == 0);
+        self.cpsr.set_signed((val >> 31) == 1);
+    }
+
+    fn teq(&mut self, instr: u32) {
+        let instr = parse_teq(instr);
+        let val = instr.op2.get(self, true);
+        let val = self.get_reg_rt(instr.rn) == val;
+        self.cpsr.set_zero(val);
+        self.cpsr.set_signed(val);
     }
 
     /// Move the contents of the CPSR or SPSR into a register.

@@ -1,6 +1,8 @@
 use super::alu::AluOp2;
 use crate::cpu::cpu::{Arm7TDMI, Psr};
 
+pub type Register = u8;
+
 pub(super) enum ShiftType {
     LogShiftLeft,
     LogShiftRight,
@@ -67,16 +69,15 @@ pub enum Operand {
     // (value, shift * 2)
     RotateRImm(u8, u8),
     // (reg, shift)
-    LogShiftLReg(u8, u8),
-    LogShiftLImm(u8, u8),
-    LogShiftRReg(u8, u8),
-    LogShiftRImm(u8, u8),
-    ArithShiftReg(u8, u8),
-    ArithShiftImm(u8, u8),
-    RotateRReg(u8, u8),
-    RotateRRegImm(u8, u8),
-    // (reg)
-    RotateRExt(u8),
+    LogShiftLReg(Register, u8),
+    LogShiftLImm(Register, u8),
+    LogShiftRReg(Register, u8),
+    LogShiftRImm(Register, u8),
+    ArithShiftReg(Register, u8),
+    ArithShiftImm(Register, u8),
+    RotateRReg(Register, u8),
+    RotateRRegImm(Register, u8),
+    RotateRExt(Register),
 }
 
 impl Operand {
@@ -112,48 +113,6 @@ impl Operand {
                 }
                 ((cpu.cpsr.carry() as u32) << 31) | (reg >> 1)
             }
-        }
-    }
-}
-
-impl From<AluOp2> for Operand {
-    fn from(s: AluOp2) -> Self {
-        match s {
-            AluOp2::Register(r) => match r.shift_type {
-                ShiftType::LogShiftLeft => {
-                    if r.by_reg {
-                        Operand::LogShiftLReg(r.rm, r.shift)
-                    } else {
-                        Operand::LogShiftLImm(r.rm, r.shift)
-                    }
-                }
-                ShiftType::LogShiftRight => {
-                    if r.by_reg {
-                        Operand::LogShiftRReg(r.rm, r.shift)
-                    } else {
-                        Operand::LogShiftRImm(r.rm, r.shift)
-                    }
-                }
-                ShiftType::ArithShiftRight => {
-                    if r.by_reg {
-                        Operand::ArithShiftReg(r.rm, r.shift)
-                    } else {
-                        Operand::ArithShiftImm(r.rm, r.shift)
-                    }
-                }
-                ShiftType::RotateRight => {
-                    if r.by_reg {
-                        Operand::RotateRReg(r.rm, r.shift)
-                    } else {
-                        if r.shift != 0 {
-                            Operand::RotateRRegImm(r.rm, r.shift)
-                        } else {
-                            Operand::RotateRExt(r.rm)
-                        }
-                    }
-                }
-            },
-            AluOp2::Immediate(i) => Operand::RotateRImm(i.imm, i.shift),
         }
     }
 }
