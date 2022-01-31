@@ -1,7 +1,11 @@
-use super::alu::{AluInstr, MrsInstr, MsrInstr};
+use super::{
+    alu::{AluInstr, MrsInstr, MsrInstr},
+    mul::MulInstr,
+};
 use crate::cpu::{
     argument::{
         alu::{AluOp2, AluOp2Imm, AluOp2Reg, AluOpcode},
+        mul::MulOpcode,
         types::{Condition, Operand, PsrArg, ShiftType},
     },
     Arm7TDMI,
@@ -104,5 +108,27 @@ pub fn parse_alu(instr: u32) -> AluInstr {
         rn,
         rd,
         op2: Operand::from(op2),
+    }
+}
+
+pub fn parse_mul(instr: u32) -> MulInstr {
+    let bytes = instr.to_le_bytes();
+    let cond = Condition::from(bytes[0] >> 4);
+    debug_assert!((bytes[0] & 0xE) == 0);
+    let opcode = MulOpcode::from(((bytes[0] & 0x1) << 3) | ((bytes[1] & 0xE0) >> 5));
+    let s = ((bytes[1] & 0x10) >> 4) == 1;
+    let rd = bytes[1] & 0x0F;
+    let rn = bytes[2] >> 4;
+    let rs = bytes[2] & 0x0F;
+    let rm = bytes[4] & 0x0F;
+
+    MulInstr {
+        cond,
+        s,
+        opcode,
+        rd,
+        rn,
+        rm,
+        rs,
     }
 }

@@ -1,5 +1,5 @@
 use super::argument::{
-    parser::{parse_alu, parse_mrs, parse_msr},
+    parser::{parse_alu, parse_mrs, parse_msr, parse_mul},
     types::PsrArg,
 };
 use modular_bitfield::prelude::*;
@@ -149,6 +149,19 @@ impl Arm7TDMI {
         self.cpsr.set_signed((res >> 31) == 1);
         self.cpsr.set_carry(res < val || res < reg);
         self.cpsr.set_overflow(reg >> 31 != res >> 31)
+    }
+
+    fn mul_flags(&mut self, n: u32) {
+        self.cpsr.set_zero(n == 0);
+        self.cpsr.set_signed((n >> 31) == 1);
+        self.cpsr.set_carry(false);
+    }
+
+    fn mul_long_flags(&mut self, n: u64) {
+        self.cpsr.set_zero(n == 0);
+        self.cpsr.set_signed((n >> 31) == 1);
+        self.cpsr.set_carry(false);
+        self.cpsr.set_overflow(false);
     }
 }
 
@@ -364,6 +377,91 @@ impl Arm7TDMI {
             self.arith_flags(reg, val, res);
         }
     }
+
+    /// Multiply
+
+    /// Multiply unsigned rm and rs, keeping the lowest 32 bits.
+    fn mul(&mut self, instr: u32) {
+        let instr = parse_mul(instr);
+        debug_assert!(instr.rd != instr.rm);
+        debug_assert!(instr.rd != 15 || instr.rn != 15 || instr.rs != 15 || instr.rm != 15);
+        let n: u32 = (((self.get_reg_rt(instr.rm) as u64) * (self.get_reg_rt(instr.rs) as u64))
+            & 0xFFFFFFFF) as u32;
+        self.set_reg_rt(instr.rd, n);
+        if instr.s {
+            self.mul_flags(n);
+        }
+    }
+
+    /// Multiply unsigned rm and rs, add rn, and keep lowest 32 bits.
+    fn mla(&mut self, instr: u32) {
+        let instr = parse_mul(instr);
+        debug_assert!(instr.rd != instr.rm);
+        debug_assert!(instr.rd != 15 || instr.rn != 15 || instr.rs != 15 || instr.rm != 15);
+        let n: u32 = (((self.get_reg_rt(instr.rm) as u64) * (self.get_reg_rt(instr.rs) as u64))
+            & 0xFFFFFFFF) as u32
+            + self.get_reg_rt(instr.rn);
+        self.set_reg_rt(instr.rd, n);
+        if instr.s {
+            self.mul_flags(n);
+        }
+    }
+
+    /// Multiply unsigned rm and rs, add rn, and put the 64 bit result into 2 registers.
+    fn umull(&mut self, instr: u32) {
+        let instr = parse_mul(instr);
+        debug_assert!(instr.rd != instr.rm);
+        debug_assert!(instr.rd != 15 || instr.rn != 15 || instr.rs != 15 || instr.rm != 15);
+        let n: u64 = (self.get_reg_rt(instr.rm) as u64) * (self.get_reg_rt(instr.rs) as u64);
+        self.set_reg_rt(instr.rd, (n >> 32) as u32);
+        self.set_reg_rt(instr.rn, (n & 0xFFFFFFFF) as u32);
+        if instr.s {
+            self.mul_long_flags(n);
+        }
+    }
+
+    /// Multiply unsigned rm and rs, add rn, and put the 64 bit result into 2 registers.
+    fn umlal(&mut self, instr: u32) {
+        let instr = parse_mul(instr);
+        debug_assert!(instr.rd != instr.rm);
+        debug_assert!(instr.rd != 15 || instr.rn != 15 || instr.rs != 15 || instr.rm != 15);
+        let n: u64 = (self.get_reg_rt(instr.rm) as u64) * (self.get_reg_rt(instr.rs) as u64)
+            + ((self.get_reg_rt(instr.rd) as u64) << 32 | self.get_reg_rt(instr.rn) as u64);
+        self.set_reg_rt(instr.rd, (n >> 32) as u32);
+        self.set_reg_rt(instr.rn, (n & 0xFFFFFFFF) as u32);
+        if instr.s {
+            self.mul_long_flags(n);
+        }
+    }
+
+    /// Multiply signed rm and rs, add rn, and put the 64 bit result into 2 registers.
+    fn smull(&mut self, instr: u32) {
+        let instr = parse_mul(instr);
+        debug_assert!(instr.rd != instr.rm);
+        debug_assert!(instr.rd != 15 || instr.rn != 15 || instr.rs != 15 || instr.rm != 15);
+        let n: i64 = (self.get_reg_rt(instr.rm) as i64) * (self.get_reg_rt(instr.rs) as i64);
+        self.set_reg_rt(instr.rd, (n >> 32) as u32);
+        self.set_reg_rt(instr.rn, (n & 0xFFFFFFFF) as u32);
+        if instr.s {
+            self.mul_long_flags(n as u64);
+        }
+    }
+
+    /// Multiply signed rm and rs, add rn, and put the 64 bit result into 2 registers.
+    fn smlal(&mut self, instr: u32) {
+        let instr = parse_mul(instr);
+        debug_assert!(instr.rd != instr.rm);
+        debug_assert!(instr.rd != 15 || instr.rn != 15 || instr.rs != 15 || instr.rm != 15);
+        let n: i64 = (self.get_reg_rt(instr.rm) as i64) * (self.get_reg_rt(instr.rs) as i64)
+            + ((self.get_reg_rt(instr.rd) as i64) << 32 | self.get_reg_rt(instr.rn) as i64);
+        self.set_reg_rt(instr.rd, (n >> 32) as u32);
+        self.set_reg_rt(instr.rn, (n & 0xFFFFFFFF) as u32);
+        if instr.s {
+            self.mul_long_flags(n as u64);
+        }
+    }
+
+    /// PSR Transfer
 
     /// Move the contents of the CPSR or SPSR into a register.
     fn mrs(&mut self, instr: u32) {
