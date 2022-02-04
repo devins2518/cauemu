@@ -1,5 +1,7 @@
 use super::argument::{
-    parser::{parse_alu, parse_mrs, parse_msr, parse_mul},
+    parser::{
+        parse_alu, parse_branch_exchange, parse_branch_link, parse_mrs, parse_msr, parse_mul,
+    },
     types::PsrArg,
 };
 use modular_bitfield::prelude::*;
@@ -61,6 +63,16 @@ impl Arm7TDMI {
     }
 
     #[inline]
+    fn get_lr(&self) -> u32 {
+        self.get_reg::<14>()
+    }
+
+    #[inline]
+    fn get_pc(&self) -> u32 {
+        self.get_reg::<15>()
+    }
+
+    #[inline]
     fn set_reg<const N: usize>(&mut self, n: u32) {
         let reg = if N < 8 || N == 15 {
             &mut self.registers[N]
@@ -76,6 +88,16 @@ impl Arm7TDMI {
             }
         };
         *reg = n;
+    }
+
+    #[inline]
+    fn set_lr(&mut self, n: u32) {
+        self.set_reg::<14>(n);
+    }
+
+    #[inline]
+    fn set_pc(&mut self, n: u32) {
+        self.set_reg::<15>(n);
     }
 
     #[rustfmt::skip]
@@ -134,6 +156,10 @@ impl Arm7TDMI {
             PsrArg::Cpsr => self.cpsr = psr,
             PsrArg::Spsr => unsafe { *self.spsr.unwrap().as_mut() = psr },
         }
+    }
+
+    fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
     }
 
     fn log_flags(&mut self, shifted: u32, res: u32, nonzero: bool) {
@@ -459,6 +485,33 @@ impl Arm7TDMI {
         if instr.s {
             self.mul_long_flags(n as u64);
         }
+    }
+
+    /// Branch and Link
+
+    fn b(&mut self, instr: u32) {
+        let instr = parse_branch_link(instr);
+        self.set_pc(self.get_pc() + 8 + ((instr.nn * 4) as u32))
+    }
+
+    fn bl(&mut self, instr: u32) {
+        let instr = parse_branch_link(instr);
+        self.set_lr(self.get_pc() + 4);
+        self.set_pc(self.get_pc() + 8 + ((instr.nn * 4) as u32));
+    }
+
+    fn bx(&mut self, instr: u32) {
+        let instr = parse_branch_exchange(instr);
+        let reg = self.get_reg_rt(instr.rn);
+        self.cpsr.set_arm(!(reg & 0x1 == 0x1));
+        self.set_pc(reg & 0xFFFFFFFE);
+    }
+
+    /// Software Interrupt
+
+    fn swi(&mut self, instr: u32) {
+        let bytes = instr.to_le_bytes();
+        unimplemented!()
     }
 
     /// PSR Transfer

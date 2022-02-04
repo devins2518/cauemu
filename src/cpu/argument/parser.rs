@@ -1,10 +1,12 @@
 use super::{
     alu::{AluInstr, MrsInstr, MsrInstr},
+    branch::{BranchExchangeInstr, BranchLinkInstr},
     mul::MulInstr,
 };
 use crate::cpu::{
     argument::{
         alu::{AluOp2, AluOp2Imm, AluOp2Reg, AluOpcode},
+        branch::BranchOpcode,
         mul::MulOpcode,
         types::{Condition, Operand, PsrArg, ShiftType},
     },
@@ -131,4 +133,23 @@ pub fn parse_mul(instr: u32) -> MulInstr {
         rm,
         rs,
     }
+}
+
+pub fn parse_branch_link(instr: u32) -> BranchLinkInstr {
+    let bytes = instr.to_le_bytes();
+    let cond = Condition::from(bytes[0]);
+    debug_assert!(bytes[0] & 0x0E == 0x0A);
+    let opcode = BranchOpcode::from(bytes[0] & 0x1);
+    let nn = ((bytes[2]) as i32) << 16 | ((bytes[3]) as i32) << 8 | ((bytes[4]) as i32);
+
+    BranchLinkInstr { cond, opcode, nn }
+}
+
+pub fn parse_branch_exchange(instr: u32) -> BranchExchangeInstr {
+    let bytes = instr.to_le_bytes();
+    let cond = Condition::from(bytes[0]);
+    debug_assert!((instr & 0x0FFFFFF0) == 0x012FFF10);
+    let rn = bytes[4] & 0x0F;
+
+    BranchExchangeInstr { cond, rn }
 }
