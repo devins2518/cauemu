@@ -41,6 +41,10 @@ impl Arm7TDMI {
         }
     }
 
+    pub fn render(&mut self) {
+        unimplemented!()
+    }
+
     pub fn clock(&mut self) {
         unimplemented!()
     }
