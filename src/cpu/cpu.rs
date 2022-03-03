@@ -1,3 +1,5 @@
+use crate::mem::Memory;
+
 use super::argument::{
     parser::{
         parse_alu, parse_branch_exchange, parse_branch_link, parse_mrs, parse_msr, parse_mul,
@@ -46,7 +48,39 @@ impl Arm7TDMI {
     }
 
     pub fn clock(&mut self) {
-        unimplemented!()
+        let op = self.read_pc();
+        match ((op >> 20) & 0xFF, (op >> 4) & 0x0F) {
+            (0x0..=0x1, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x20 | 0x21, _) => self.and(op),
+            (0x2..=0x3, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x22 | 0x23, _) => self.eor(op),
+            (0x4..=0x5, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x24 | 0x25, _) => self.sub(op),
+            (0x6..=0x7, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x26 | 0x27, _) => self.rsb(op),
+            (0x8..=0x9, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x28 | 0x29, _) => self.add(op),
+            (0xA..=0xB, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x2A | 0x2B, _) => self.adc(op),
+            (0xC..=0xD, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x2C | 0x2D, _) => self.sbc(op),
+            (0xE..=0xF, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x2E | 0x2F, _) => self.rsc(op),
+            (0x10 | 0x14, 0x0) => self.mrs(op),
+            (0x11, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x30 | 0x31, _) => self.tst(op),
+            (0x13, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x33, _) => self.teq(op),
+            (0x15, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x34 | 0x35, _) => self.cmp(op),
+            (0x16, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x37, _) => self.cmn(op),
+            (0x18..=0x19, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x38 | 0x39, _) => self.orr(op),
+            (0x1A..=0x1B, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x3A | 0x3B, _) => self.mov(op),
+            (0x1C..=0x1D, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x3C | 0x3D, _) => self.bic(op),
+            (0x1E..=0x1F, 0x0..=0x8 | 0xA | 0xC | 0xE) | (0x3E | 0x3F, _) => self.mvn(op),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn read_pc(&mut self) -> u32 {
+        let b1 = self.read(self.get_pc());
+        self.set_pc(self.get_pc() + 1);
+        let b2 = self.read(self.get_pc());
+        self.set_pc(self.get_pc() + 1);
+        let b3 = self.read(self.get_pc());
+        self.set_pc(self.get_pc() + 1);
+        let b4 = self.read(self.get_pc());
+        self.set_pc(self.get_pc() + 1);
+        u32::from_le_bytes([b4, b3, b2, b1])
     }
 
     #[inline]
@@ -192,6 +226,45 @@ impl Arm7TDMI {
         self.cpsr.set_signed((n >> 31) == 1);
         self.cpsr.set_carry(false);
         self.cpsr.set_overflow(false);
+    }
+}
+
+impl Memory for Arm7TDMI {
+    fn read(&self, addr: u32) -> u8 {
+        match addr {
+            0x00000000..=0x04FFFFFF => todo!("read memory: addr: {addr:02x}"),
+            0x05000000..=0x07FFFFFF => todo!("read vram: addr: {addr:02x}"),
+            0x08000000..=0x09FFFFFF => todo!("read cartridge wait state 0: addr: {addr:02x}"),
+            0x0A000000..=0x0BFFFFFF => todo!("read cartridge wait state 1: addr: {addr:02x}"),
+            0x0C000000..=0x0DFFFFFF => todo!("read cartridge wait state 2: addr: {addr:02x}"),
+            0x0E000000..=0x0E00FFFF => todo!("read cartridge sram: addr: {addr:02x}"),
+            0x0E010000..=0x0FFFFFFF => panic!("not used: addr: {addr:02x}"),
+            0x10000000..=0xFFFFFFFF => {
+                panic!("invalid memory address (upper 4 bits not used): addr: {addr:02x}")
+            }
+        }
+    }
+    fn write(&mut self, addr: u32, n: u8) {
+        match addr {
+            0x00000000..=0x04FFFFFF => todo!("write memory: addr: {addr:02x}, n: {n:02x}"),
+            0x05000000..=0x07FFFFFF => todo!("write vram: addr: {addr:02x}, n: {n:02x}"),
+            0x08000000..=0x09FFFFFF => {
+                todo!("write cartridge wait state 0: addr: {addr:02x}, n: {n:02x}")
+            }
+            0x0A000000..=0x0BFFFFFF => {
+                todo!("write cartridge wait state 1: addr: {addr:02x}, n: {n:02x}")
+            }
+            0x0C000000..=0x0DFFFFFF => {
+                todo!("write cartridge wait state 2: addr: {addr:02x}, n: {n:02x}")
+            }
+            0x0E000000..=0x0E00FFFF => todo!("write cartridge sram: addr: {addr:02x}, n: {n:02x}"),
+            0x0E010000..=0x0FFFFFFF => panic!("not used: addr: {addr:02x}, n: {n:02x}"),
+            0x10000000..=0xFFFFFFFF => {
+                panic!(
+                    "invalid memory address (upper 4 bits not used): addr: {addr:02x}, n: {n:02x}"
+                )
+            }
+        }
     }
 }
 
