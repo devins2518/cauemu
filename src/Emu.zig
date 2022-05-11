@@ -18,6 +18,12 @@ pub fn init() Self {
     return .{ .bus = bus, .cpu = cpu, .ppu = ppu };
 }
 
+pub fn deinit(self: Self) void {
+    self.bus.deinit();
+    self.cpu.deinit();
+    self.ppu.deinit();
+}
+
 test "static analysis" {
     std.testing.refAllDecls(@This());
 }
