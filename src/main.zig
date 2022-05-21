@@ -13,5 +13,6 @@ test "static analysis" {
     _ = @import("Emu.zig");
     _ = @import("Ppu.zig");
     _ = @import("instr.zig");
+    _ = @import("utils.zig");
     std.testing.refAllDecls(@This());
 }
