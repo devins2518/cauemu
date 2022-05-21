@@ -1,6 +1,6 @@
 const std = @import("std");
 const utils = @import("utils.zig");
-const field = utils.field;
+const Field = utils.Field;
 
 const Instruction = struct {
     instr: union(enum) {
@@ -111,7 +111,7 @@ fn parseOp2(op: u32) Op2 {
                     }
                 },
                 // TODO: ew
-                .shift_type = @intToEnum(field(field(Op2, .reg), .shift_type), (op & 0x00000060) >> 5),
+                .shift_type = @intToEnum(Field(Field(Op2, .reg), .shift_type), (op & 0x00000060) >> 5),
                 .reg = @truncate(u4, op & 0x0000000F),
             },
         };
@@ -394,19 +394,19 @@ const SDTransferInstr = struct {
 fn parseSDTransfer(op: u32, assert: SDTransferOpcode) SDTransferInstr {
     std.debug.assert((op & 0x04000000) >> 26 == 0b01);
     std.debug.assert((op & 0x00100000) >> 20 == @enumToInt(assert));
-    const when = @intToEnum(field(SDTransferInstr, .when), (op & 0x01000000) >> 24);
-    const base_op = @intToEnum(field(SDTransferInstr, .base_op), (op & 0x00800000) >> 23);
-    const size = @intToEnum(field(SDTransferInstr, .size), (op & 0x00400000) >> 22);
+    const when = @intToEnum(Field(SDTransferInstr, .when), (op & 0x01000000) >> 24);
+    const base_op = @intToEnum(Field(SDTransferInstr, .base_op), (op & 0x00800000) >> 23);
+    const size = @intToEnum(Field(SDTransferInstr, .size), (op & 0x00400000) >> 22);
     const rn = @truncate(u4, (op & 0x000F0000) >> 16);
     const rd = @truncate(u4, (op & 0x0000F000) >> 16);
     const offset = blk: {
         if ((op & 0x02000000) >> 20 == 0b0) {
-            break :blk field(SDTransferInstr, .offset){ .imm = (@truncate(u12, op & 0x00000FFF)) };
+            break :blk Field(SDTransferInstr, .offset){ .imm = (@truncate(u12, op & 0x00000FFF)) };
         } else {
             std.debug.assert((op & 0x00000008) >> 4 == 0b0);
-            break :blk field(SDTransferInstr, .offset){ .reg = .{
+            break :blk Field(SDTransferInstr, .offset){ .reg = .{
                 .shift_amt = @truncate(u5, (op & 0x00000F80) >> 7),
-                .shift_type = @intToEnum(field(field(field(SDTransferInstr, .offset), .reg), .shift_type), (op & 0x00000F80) >> 7),
+                .shift_type = @intToEnum(Field(Field(Field(SDTransferInstr, .offset), .reg), .shift_type), (op & 0x00000F80) >> 7),
                 .rm = @truncate(u4, op & 0x0000000F),
             } };
         }
@@ -436,10 +436,10 @@ const BDTransferInstr = struct {
 fn parseBDTransfer(op: u32, assert: BDTransferOpcode) BDTransferInstr {
     std.debug.assert((op & 0x0E000000) >> 25 == 0b100);
     std.debug.assert((op & 0x00100000) >> 20 == @enumToInt(assert));
-    const when = @intToEnum(field(BDTransferInstr, .when), (op & 0x01000000) >> 24);
-    const base_op = @intToEnum(field(BDTransferInstr, .base_op), (op & 0x00800000) >> 23);
-    const force_user = @intToEnum(field(BDTransferInstr, .force_user), (op & 0x00400000) >> 22);
-    const write_back = @intToEnum(field(BDTransferInstr, .write_back), (op & 0x00200000) >> 21);
+    const when = @intToEnum(Field(BDTransferInstr, .when), (op & 0x01000000) >> 24);
+    const base_op = @intToEnum(Field(BDTransferInstr, .base_op), (op & 0x00800000) >> 23);
+    const force_user = @intToEnum(Field(BDTransferInstr, .force_user), (op & 0x00400000) >> 22);
+    const write_back = @intToEnum(Field(BDTransferInstr, .write_back), (op & 0x00200000) >> 21);
     const rn = @truncate(u4, (op & 0x000F0000) >> 16);
     const reg_list = [4]Register{
         @truncate(u4, op & 0x0000F000 >> 12),
@@ -468,7 +468,7 @@ fn parseSDSwap(op: u32, assert: SDSwapOpcode) SDSwapInstr {
     std.debug.assert((op & 0x0F800000) >> 23 == @enumToInt(assert));
     std.debug.assert((op & 0x00300000) >> 20 == 0b00);
     std.debug.assert((op & 0x00000FF0) >> 4 == 0b00001001);
-    const size = @intToEnum(field(SDSwapInstr, .size), (op & 0x00400000) >> 22);
+    const size = @intToEnum(Field(SDSwapInstr, .size), (op & 0x00400000) >> 22);
     const rn = @truncate(u4, (op & 0x0000F000) >> 16);
     const rd = @truncate(u4, (op & 0x00000F00) >> 12);
     const rm = @truncate(u4, op & 0x0000000F);
@@ -524,14 +524,14 @@ fn parsePSRTransfer(op: u32, assert: PSRTransferOpcode) PSRTransferInstr {
     std.debug.assert((op & 0x01000000) >> 23 == 0b10);
     std.debug.assert((op & 0x00200000) >> 21 == @enumToInt(assert));
     std.debug.assert((op & 0x00100000) >> 20 == 0b0);
-    const source = @intToEnum(field(PSRTransferInstr, .source), (op & 0x00400000) >> 22);
+    const source = @intToEnum(Field(PSRTransferInstr, .source), (op & 0x00400000) >> 22);
     const payload = blk: {
         switch (assert) {
             .mrs => {
                 std.debug.assert((op & 0x000F0000) >> 16 == 0xF);
                 std.debug.assert(op & 0x00000FFF == 0x000);
                 const rd = @truncate(u4, (op & 0x0000F000) >> 12);
-                break :blk field(PSRTransferInstr, .payload){ .mrs = .{
+                break :blk Field(PSRTransferInstr, .payload){ .mrs = .{
                     .rd = rd,
                 } };
             },
@@ -541,9 +541,22 @@ fn parsePSRTransfer(op: u32, assert: PSRTransferOpcode) PSRTransferInstr {
                 const write_s = (op & 0x00040000) >> 18 == 1;
                 const write_x = (op & 0x00020000) >> 17 == 1;
                 const write_c = (op & 0x00010000) >> 16 == 1;
-                // TODO
-                const src = undefined;
-                break :blk field(PSRTransferInstr, .payload){ .msr = .{
+                const src = src: {
+                    if ((op & 0x02000000) >> 25 == 0b1) {
+                        break :src Field(Field(Field(PSRTransferInstr, .payload), .msr), .src){
+                            .imm = .{
+                                .shift_by = @truncate(u4, (op & 0x00000F00) >> 8),
+                                .imm = @truncate(u8, op & 0x000000FF),
+                            },
+                        };
+                    } else {
+                        std.debug.assert((op & 0x00000FF0) >> 4 == 0x00);
+                        break :src Field(Field(Field(PSRTransferInstr, .payload), .msr), .src){
+                            .reg = @truncate(u4, op & 0x0000000F),
+                        };
+                    }
+                };
+                break :blk Field(PSRTransferInstr, .payload){ .msr = .{
                     .write_f = write_f,
                     .write_s = write_s,
                     .write_x = write_x,
