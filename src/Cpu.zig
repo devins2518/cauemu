@@ -1,6 +1,7 @@
 const std = @import("std");
-const Self = @This();
 const instr = @import("instr.zig");
+const Bus = @import("Bus.zig");
+const Self = @This();
 
 const Reg0 = 0;
 const Reg1 = 1;
@@ -61,9 +62,10 @@ spsr_svc: Cpsr = undefined,
 spsr_abt: Cpsr = undefined,
 spsr_irq: Cpsr = undefined,
 spsr_und: Cpsr = undefined,
+bus: Bus,
 
 pub fn init() Self {
-    return .{};
+    return .{ .bus = Bus.init() };
 }
 
 pub fn deinit(self: Self) void {
@@ -105,9 +107,83 @@ fn setReg(self: *Self, reg: instr.Register, n: u32) void {
     self.getRegPtr(reg).* = n;
 }
 
+fn readWord(self: *Self) u32 {
+    return self.bus.readWord(self.getReg(15));
+}
+
 pub fn clock(self: *Self) void {
+    const opcode = instr.parseOpcode(self.readWord());
+    switch (opcode.instr) {
+        else => std.debug.todo("unimplemented opcode"),
+    }
+}
+
+// Logical Alu
+fn mov(self: *Self, payload: instr.AluInstr) void {
     _ = self;
-    @panic("unimplemented");
+    _ = payload;
+}
+fn mnv(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn orr(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn eor(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn and_(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn bic(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn tst(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn teq(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+
+// Arithmetic ALU
+fn add(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn adc(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn srb(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn sbc(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn rsb(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn rsc(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn cmp(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
+}
+fn cmn(self: *Self, payload: instr.AluInstr) void {
+    _ = self;
+    _ = payload;
 }
 
 test "reg access" {

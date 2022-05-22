@@ -4,7 +4,6 @@ const Emu = @import("Emu.zig");
 pub fn main() anyerror!void {
     var gba = Emu.init();
     defer gba.deinit();
-    _ = gba;
 }
 
 test "static analysis" {

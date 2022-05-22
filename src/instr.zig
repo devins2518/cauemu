@@ -308,7 +308,7 @@ const AluOpcode = enum(u8) {
     bic = 0xE,
     mvn = 0xF,
 };
-const AluInstr = struct {
+pub const AluInstr = struct {
     s: bool,
     rd: Register,
     rn: Register,
@@ -342,7 +342,7 @@ const MulOpcode = enum(u8) {
     smull = 0x6,
     smlal = 0x7,
 };
-const MulInstr = struct {
+pub const MulInstr = struct {
     s: bool,
     rd: Register, // RdHi
     rn: Register, // RdLo
@@ -371,7 +371,7 @@ const SDTransferOpcode = enum(u2) {
     str = 0x0,
     ldr = 0x1,
 };
-const SDTransferInstr = struct {
+pub const SDTransferInstr = struct {
     when: enum(u1) { post = 0, pre = 1 },
     base_op: enum(u1) { sub = 0, add = 1 },
     size: enum(u1) { word = 0, byte = 1 },
@@ -425,7 +425,7 @@ const BDTransferOpcode = enum(u2) {
     stm = 0x0,
     ldm = 0x1,
 };
-const BDTransferInstr = struct {
+pub const BDTransferInstr = struct {
     when: enum(u1) { post = 0, pre = 1 },
     base_op: enum(u1) { sub = 0, add = 1 },
     force_user: enum(u1) { no = 0, force_user = 1 },
@@ -458,7 +458,7 @@ fn parseBDTransfer(op: u32, assert: BDTransferOpcode) BDTransferInstr {
 }
 
 const SDSwapOpcode = enum(u5) { swp = 0b00010 };
-const SDSwapInstr = struct {
+pub const SDSwapInstr = struct {
     size: enum(u1) { word = 0, byte = 1 },
     rn: Register,
     rd: Register,
@@ -481,7 +481,7 @@ fn parseSDSwap(op: u32, assert: SDSwapOpcode) SDSwapInstr {
 }
 
 const BranchOpcode = enum(u1) { b = 0b0, bl = 0b1 };
-const BranchInstr = struct { offset: u24 };
+pub const BranchInstr = struct { offset: u24 };
 fn parseBranch(op: u32, assert: BranchOpcode) BranchInstr {
     std.debug.assert((op & 0x0E000000) >> 25 == 0b0101);
     std.debug.assert((op & 0x01000000) >> 24 == @enumToInt(assert));
