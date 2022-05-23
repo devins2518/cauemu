@@ -119,71 +119,73 @@ pub fn clock(self: *Self) void {
 }
 
 // Logical Alu
-fn mov(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn mnv(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn orr(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn eor(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn and_(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn bic(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn tst(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn teq(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
+fn alu(self: *Self, payload: instr.AluInstr) void {
+    const op2 = switch (payload.op2) {
+        .reg => |s| blk: {
+            const reg = self.getReg(s.reg);
+            const shift_by = switch (s.shift_by) {
+                .imm => |imm| imm,
+                .reg => |reg| self.getReg(reg),
+            };
+            break :blk switch (s.shift_type) {
+                .lsl => .{
+                    .val = reg << shift_by,
+                    .carry = @as(bool, reg >> (32 - shift_by) & 0x1),
+                },
+                .lsr => .{
+                    .val = reg >> shift_by,
+                    .carry = @as(bool, reg >> shift_by & 0x1),
+                },
+                .asr => .{
+                    .val = @bitCast(u32, @bitCast(i32, reg) >> shift_by),
+                    .carry = @as(bool, reg >> shift_by & 0x1),
+                },
+                .ror => .{
+                    .val = std.math.rotr(u32, reg, shift_by),
+                    .carry = @as(bool, reg >> shift_by & 0x1),
+                },
+            };
+        },
+        .imm => |s| .{
+            .val = std.math.rotr(u32, s.imm, s.rot * 2),
+            .carry = @as(bool, s.imm >> s.rot & 0x1),
+        },
+    };
+    const res = switch (payload.op) {
+        .mov => op2.val,
+        .mvn => ~op2.val,
+        .orr => payload.rn | op2.val,
+        .eor, .teq => payload.rn ^ op2.val,
+        .and_, .tst => payload.rn & op2.val,
+        .bic => payload.rn & ~op2.val,
+        .add => payload.rn + op2.val,
+        .adc => payload.rn + op2.val + self.cpsr.carry,
+        .sub => payload.rn - op2.val,
+        .sbc => payload.rn - op2.val + self.cpsr.carry - 1,
+        .rsb => op2.val - payload.rn,
+        .rsc => op2.val - payload.rn + self.cpsr.carry - 1,
+        .cmp => payload.rn - op2.val,
+        .cmn => payload.rn + op2.val,
+    };
 
-// Arithmetic ALU
-fn add(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn adc(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn srb(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn sbc(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn rsb(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn rsc(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn cmp(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
-}
-fn cmn(self: *Self, payload: instr.AluInstr) void {
-    _ = self;
-    _ = payload;
+    if (payload.op != .tst or payload.op != .teq or payload.op != .cmp or payload.op != .cmn)
+        self.setReg(payload.rd, res);
+
+    if (payload.s and payload.rd != 15) {
+        if (res == 0) self.cpsr.zero = true;
+        blk: {
+            if (payload.op.isLogical()) {
+                switch (payload.op2) {
+                    .reg => |reg| if (reg.shift_by == 0) break :blk,
+                    .imm => |imm| if (imm.rot == 0) break :blk,
+                }
+            }
+            self.cpsr.carry = op2.carry;
+        }
+        if (!payload.op.isLogical())
+            self.cpsr.overflow = res >> 31 != payload.rd >> 31;
+        self.cpsr.signed = @as(bool, res >> 31);
+    }
 }
 
 test "reg access" {

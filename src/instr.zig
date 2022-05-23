@@ -290,7 +290,7 @@ pub fn parseOpcode(op: u32) Instruction {
     };
 }
 
-const AluOpcode = enum(u8) {
+pub const AluOpcode = enum(u8) {
     and_ = 0x0,
     eor = 0x1,
     sub = 0x2,
@@ -307,9 +307,21 @@ const AluOpcode = enum(u8) {
     mov = 0xD,
     bic = 0xE,
     mvn = 0xF,
+
+    pub fn isLogical(self: @This()) bool {
+        return self == .mov or
+            self == .mvn or
+            self == .orr or
+            self == .eor or
+            self == .and_ or
+            self == .bic or
+            self == .tst or
+            self == .teq;
+    }
 };
 pub const AluInstr = struct {
     s: bool,
+    op: AluOpcode,
     rd: Register,
     rn: Register,
     op2: Op2,
@@ -328,13 +340,14 @@ fn parseAlu(op: u32, assert: AluOpcode) AluInstr {
         std.debug.assert(rd == 0x0);
     return .{
         .s = s,
+        .op = assert,
         .rd = rd,
         .rn = rn,
         .op2 = op2,
     };
 }
 
-const MulOpcode = enum(u8) {
+pub const MulOpcode = enum(u8) {
     mul = 0x0,
     mla = 0x1,
     umull = 0x4,
@@ -344,6 +357,7 @@ const MulOpcode = enum(u8) {
 };
 pub const MulInstr = struct {
     s: bool,
+    op: MulOpcode,
     rd: Register, // RdHi
     rn: Register, // RdLo
     rs: Register,
@@ -360,6 +374,7 @@ fn parseMul(op: u32, assert: MulOpcode) MulInstr {
     const rm = @truncate(u4, (op & 0x0000000F) >> 16);
     return .{
         .s = s,
+        .op = assert,
         .rd = rd,
         .rn = rn,
         .rs = rs,
@@ -375,6 +390,7 @@ pub const SDTransferInstr = struct {
     when: enum(u1) { post = 0, pre = 1 },
     base_op: enum(u1) { sub = 0, add = 1 },
     size: enum(u1) { word = 0, byte = 1 },
+    op: SDTransferOpcode,
     rn: Register,
     rd: Register,
     offset: union(enum) {
@@ -415,6 +431,7 @@ fn parseSDTransfer(op: u32, assert: SDTransferOpcode) SDTransferInstr {
         .when = when,
         .base_op = base_op,
         .size = size,
+        .op = assert,
         .rn = rn,
         .rd = rd,
         .offset = offset,
@@ -430,6 +447,7 @@ pub const BDTransferInstr = struct {
     base_op: enum(u1) { sub = 0, add = 1 },
     force_user: enum(u1) { no = 0, force_user = 1 },
     write_back: enum(u1) { no = 0, write = 1 },
+    op: BDTransferOpcode,
     rn: Register,
     reg_list: [4]Register,
 };
@@ -452,6 +470,7 @@ fn parseBDTransfer(op: u32, assert: BDTransferOpcode) BDTransferInstr {
         .base_op = base_op,
         .force_user = force_user,
         .write_back = write_back,
+        .op = assert,
         .rn = rn,
         .reg_list = reg_list,
     };
@@ -460,6 +479,7 @@ fn parseBDTransfer(op: u32, assert: BDTransferOpcode) BDTransferInstr {
 const SDSwapOpcode = enum(u5) { swp = 0b00010 };
 pub const SDSwapInstr = struct {
     size: enum(u1) { word = 0, byte = 1 },
+    op: SDSwapOpcode,
     rn: Register,
     rd: Register,
     rm: Register,
@@ -474,6 +494,7 @@ fn parseSDSwap(op: u32, assert: SDSwapOpcode) SDSwapInstr {
     const rm = @truncate(u4, op & 0x0000000F);
     return .{
         .size = size,
+        .op = assert,
         .rn = rn,
         .rd = rd,
         .rm = rm,
@@ -481,23 +502,30 @@ fn parseSDSwap(op: u32, assert: SDSwapOpcode) SDSwapInstr {
 }
 
 const BranchOpcode = enum(u1) { b = 0b0, bl = 0b1 };
-pub const BranchInstr = struct { offset: u24 };
+pub const BranchInstr = struct {
+    op: BranchOpcode,
+    offset: u24,
+};
 fn parseBranch(op: u32, assert: BranchOpcode) BranchInstr {
     std.debug.assert((op & 0x0E000000) >> 25 == 0b0101);
     std.debug.assert((op & 0x01000000) >> 24 == @enumToInt(assert));
-    return .{ .offset = @truncate(u24, op & 0x00FFFFFF) };
+    return .{ .op = assert, .offset = @truncate(u24, op & 0x00FFFFFF) };
 }
 
 const BranchExOpcode = enum(u4) { bx = 0b0001 };
-const BranchExInstr = struct { reg: Register };
+const BranchExInstr = struct {
+    op: BranchExOpcode,
+    reg: Register,
+};
 fn parseBranchEx(op: u32, assert: BranchExOpcode) BranchExInstr {
     std.debug.assert((op & 0x0FFFFF00) >> 8 == 0x12FFF);
     std.debug.assert((op & 0x000000F0) >> 4 == @enumToInt(assert));
-    return .{ .reg = @truncate(u4, op & 0x0000000F) };
+    return .{ .op = assert, .reg = @truncate(u4, op & 0x0000000F) };
 }
 
 const PSRTransferOpcode = enum(u2) { mrs = 0b0, msr = 0b1 };
 const PSRTransferInstr = struct {
+    op: PSRTransferOpcode,
     source: enum(u1) {
         cpsr = 0b0,
         spsr = 0b1,
@@ -566,7 +594,7 @@ fn parsePSRTransfer(op: u32, assert: PSRTransferOpcode) PSRTransferInstr {
             },
         }
     };
-    return .{ .source = source, .payload = payload };
+    return .{ .op = assert, .source = source, .payload = payload };
 }
 
 test "static analysis" {
