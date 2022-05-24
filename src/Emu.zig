@@ -1,4 +1,8 @@
 const std = @import("std");
+const sdl = @cImport({
+    @cInclude("SDL.h");
+});
+const utils = @import("utils.zig");
 const Bus = @import("Bus.zig");
 const Cpu = @import("Cpu.zig");
 const Ppu = @import("Ppu.zig");
@@ -11,9 +15,11 @@ cpu: Cpu,
 ppu: Ppu,
 
 pub fn init() Self {
-    const bus = Bus.init();
+    var bus = Bus.init();
     const cpu = Cpu.init();
-    const ppu = Ppu.init();
+    const ppu = Ppu.init(&bus);
+
+    if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) utils.sdlPanic();
 
     return .{ .bus = bus, .cpu = cpu, .ppu = ppu };
 }

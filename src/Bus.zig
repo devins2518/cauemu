@@ -25,6 +25,7 @@ const OAM_START = 0x07000000;
 const OAM_END = 0x070003FF;
 const OAM_SIZE = OAM_END - OAM_START + 1;
 
+// TODO allocate to avoid ptr invalidation
 bios: [BIOS_SIZE]u8,
 wram_ob: [WRAM_OB_SIZE]u8,
 wram_oc: [WRAM_OC_SIZE]u8,
@@ -81,7 +82,7 @@ pub fn writeWord(self: *Self, addr: u32, n: u32) void {
     @ptrCast(*u32, @alignCast(@alignOf(*u32), self.getAddr(addr))).* = n;
 }
 
-fn getAddr(self: *Self, addr: u32) *u8 {
+pub fn getAddr(self: *Self, addr: u32) *u8 {
     return switch (addr) {
         0x00000000...0x00003FFF => &self.bios[addr],
         0x02000000...0x0203FFFF => &self.wram_ob[@mod(addr, WRAM_OB_START)],
