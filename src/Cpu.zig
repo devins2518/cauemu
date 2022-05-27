@@ -3,6 +3,9 @@ const instr = @import("instr.zig");
 const Bus = @import("Bus.zig");
 const Self = @This();
 
+const SP = 13;
+const LR = 13;
+const PC = 13;
 const Reg0 = 0;
 const Reg1 = 1;
 const Reg2 = 2;
@@ -114,42 +117,135 @@ fn readWord(self: *Self) u32 {
 pub fn clock(self: *Self) void {
     const opcode = instr.parseOpcode(self.readWord());
     switch (opcode.instr) {
-        else => std.debug.todo("unimplemented opcode"),
+        // Logical ALU
+        .mov => |mov| self.alu(mov),
+        .mvn => |mvn| self.alu(mvn),
+        .orr => |orr| self.alu(orr),
+        .eor => |eor| self.alu(eor),
+        .and_ => |and_| self.alu(and_),
+        .bic => |bic| self.alu(bic),
+        .tst => |tst| self.alu(tst),
+        .teq => |teq| self.alu(teq),
+        // Arithmetic ALU
+        .add => |add| self.alu(add),
+        .adc => |adc| self.alu(adc),
+        .sub => |sub| self.alu(sub),
+        .sbc => |sbc| self.alu(sbc),
+        .rsb => |rsb| self.alu(rsb),
+        .rsc => |rsc| self.alu(rsc),
+        .cmp => |cmp| self.alu(cmp),
+        .cmn => |cmn| self.alu(cmn),
+        // Jump
+        .b => |b| self.branch(b),
+        .bl => |bl| self.branch(bl),
+        else => {
+            std.log.err("unimplemented opcode {}", .{opcode.instr});
+            std.process.exit(1);
+        },
     }
 }
 
-// Logical Alu
+// Logical/Arithmetic Alu
 fn alu(self: *Self, payload: instr.AluInstr) void {
-    const op2 = switch (payload.op2) {
-        .reg => |s| blk: {
-            const reg = self.getReg(s.reg);
-            const shift_by = switch (s.shift_by) {
-                .imm => |imm| imm,
-                .reg => |reg| self.getReg(reg),
-            };
-            break :blk switch (s.shift_type) {
-                .lsl => .{
-                    .val = reg << shift_by,
-                    .carry = @as(bool, reg >> (32 - shift_by) & 0x1),
-                },
-                .lsr => .{
-                    .val = reg >> shift_by,
-                    .carry = @as(bool, reg >> shift_by & 0x1),
-                },
-                .asr => .{
-                    .val = @bitCast(u32, @bitCast(i32, reg) >> shift_by),
-                    .carry = @as(bool, reg >> shift_by & 0x1),
-                },
-                .ror => .{
-                    .val = std.math.rotr(u32, reg, shift_by),
-                    .carry = @as(bool, reg >> shift_by & 0x1),
-                },
-            };
-        },
-        .imm => |s| .{
-            .val = std.math.rotr(u32, s.imm, s.rot * 2),
-            .carry = @as(bool, s.imm >> s.rot & 0x1),
-        },
+    // TODO
+    const op2: struct { val: u32, carry: bool } = blk: {
+        switch (payload.op2) {
+            .reg => |s| {
+                const rm = self.getReg(s.reg);
+                switch (s.shift_by) {
+                    // LSL#0
+                    .imm => |imm| {
+                        switch (s.shift_type) {
+                            .lsl => if (imm == 0) {
+                                break :blk .{ .val = rm, .carry = self.cpsr.carry };
+                            } else {
+                                break :blk .{
+                                    .val = rm << imm,
+                                    .carry = rm >> (31 - imm) & 0x1 == 0x1,
+                                };
+                            },
+                            .lsr => break :blk .{
+                                .val = rm >> imm,
+                                .carry = rm >> imm & 0x1 == 0x1,
+                            },
+                            .asr => break :blk .{
+                                .val = @intCast(u32, @bitCast(i32, rm) >> imm),
+                                .carry = rm >> imm & 0x1 == 0x1,
+                            },
+                            .ror => break :blk .{
+                                .val = std.math.rotr(u32, rm, @intCast(u8, imm)),
+                                .carry = rm >> (imm - 1) & 0x1 == 0x1,
+                            },
+                        }
+                    },
+                    .reg => |rs| {
+                        const shift = @truncate(u8, self.getReg(rs));
+                        const shift_u5 = @truncate(u5, shift);
+                        switch (s.shift_type) {
+                            .lsl => if (shift == 32) {
+                                break :blk .{ .val = 0, .carry = rm & 0x1 == 0x1 };
+                            } else if (shift > 32) {
+                                break :blk .{ .val = 0, .carry = false };
+                            } else {
+                                break :blk .{
+                                    .val = rm << shift_u5,
+                                    .carry = rm >> (31 - shift_u5) & 0x1 == 0x1,
+                                };
+                            },
+                            .lsr => if (shift == 32) {
+                                break :blk .{ .val = 0, .carry = rm >> 31 & 0x1 == 0x1 };
+                            } else if (shift > 32) {
+                                break :blk .{ .val = 0, .carry = false };
+                            } else {
+                                break :blk .{
+                                    .val = rm >> shift_u5,
+                                    .carry = rm >> shift_u5 & 0x1 == 0x1,
+                                };
+                            },
+                            .asr => if (shift >= 32) {
+                                break :blk .{
+                                    .val = @intCast(u32, @bitCast(i32, rm) >> 31),
+                                    .carry = rm >> 31 & 0x1 == 0x1,
+                                };
+                            } else {
+                                break :blk .{
+                                    .val = @intCast(u32, @bitCast(i32, rm) >> shift_u5),
+                                    .carry = rm >> shift_u5 & 0x1 == 0x1,
+                                };
+                            },
+                            .ror => if (shift == 32) {
+                                break :blk .{ .val = rm, .carry = rm >> 31 & 0x1 == 0x1 };
+                            } else if (shift == 0) {
+                                break :blk .{
+                                    .val = @intCast(u32, @boolToInt(self.cpsr.carry)) << 31 |
+                                        rm >> 1,
+                                    .carry = rm & 0x1 == 0x1,
+                                };
+                            } else if (shift > 32) {
+                                // TODO carry might be off
+                                break :blk .{
+                                    .val = std.math.rotr(u32, rm, @mod(shift, 32)),
+                                    .carry = rm >> (shift_u5 - 1) & 0x1 == 0x1,
+                                };
+                            } else {
+                                break :blk .{
+                                    .val = std.math.rotr(u32, rm, shift),
+                                    .carry = rm >> (shift_u5 - 1) & 0x1 == 0x1,
+                                };
+                            },
+                        }
+                    },
+                }
+            },
+            .imm => |s| {
+                const val = std.math.rotr(u32, s.imm, @intCast(u8, s.rot * 2));
+                break :blk .{
+                    .val = val,
+                    // TODO: accurate?
+                    .carry = val >> (s.rot * 2) & 0x1 == 0x1,
+                };
+            },
+        }
     };
     const res = switch (payload.op) {
         .mov => op2.val,
@@ -159,11 +255,11 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
         .and_, .tst => payload.rn & op2.val,
         .bic => payload.rn & ~op2.val,
         .add => payload.rn + op2.val,
-        .adc => payload.rn + op2.val + self.cpsr.carry,
+        .adc => payload.rn + op2.val + @boolToInt(self.cpsr.carry),
         .sub => payload.rn - op2.val,
-        .sbc => payload.rn - op2.val + self.cpsr.carry - 1,
+        .sbc => payload.rn - op2.val + @boolToInt(self.cpsr.carry) - 1,
         .rsb => op2.val - payload.rn,
-        .rsc => op2.val - payload.rn + self.cpsr.carry - 1,
+        .rsc => op2.val - payload.rn + @boolToInt(self.cpsr.carry) - 1,
         .cmp => payload.rn - op2.val,
         .cmn => payload.rn + op2.val,
     };
@@ -176,16 +272,24 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
         blk: {
             if (payload.op.isLogical()) {
                 switch (payload.op2) {
-                    .reg => |reg| if (reg.shift_by == 0) break :blk,
-                    .imm => |imm| if (imm.rot == 0) break :blk,
+                    .reg => |reg| switch (reg.shift_by) {
+                        .imm => |val| if (val == 0) break :blk,
+                        .reg => |val| if (self.getReg(val) == 0) break :blk,
+                    },
+                    else => {},
                 }
             }
             self.cpsr.carry = op2.carry;
         }
         if (!payload.op.isLogical())
-            self.cpsr.overflow = res >> 31 != payload.rd >> 31;
-        self.cpsr.signed = @as(bool, res >> 31);
+            self.cpsr.overflow = res >> 31 != self.getReg(payload.rd) >> 31;
+        self.cpsr.signed = res >> 31 & 0x1 == 0x1;
     }
+}
+
+fn branch(self: *Self, payload: instr.BranchInstr) void {
+    if (payload.op == .bl) self.setReg(LR, self.getReg(PC));
+    self.setReg(PC, self.getReg(PC) +% @bitCast(u24, payload.offset));
 }
 
 test "reg access" {

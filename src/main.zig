@@ -4,9 +4,19 @@ const sdl = @cImport({
 });
 const Emu = @import("Emu.zig");
 
+const CLOCKS_PER_SEC_MHZ = 16.78;
+const CLOCKS_PER_SEC_HZ = CLOCKS_PER_SEC_MHZ * 1000000.0;
+const SECS_PER_CLOCK = 1 / CLOCKS_PER_SEC_HZ;
+const NSECS_PER_CLOCK = @as(
+    comptime_int,
+    @floor(SECS_PER_CLOCK * @as(comptime_float, std.time.ns_per_s)),
+);
+
 pub fn main() anyerror!void {
     var gba = Emu.init();
     defer gba.deinit();
+
+    var timer = try std.time.Timer.start();
 
     var e: sdl.SDL_Event = undefined;
     main: while (true) {
@@ -16,6 +26,9 @@ pub fn main() anyerror!void {
                 else => {},
             }
         }
+        gba.clock();
+        var sleep = timer.previous.since(timer.started);
+        std.time.sleep(NSECS_PER_CLOCK -| sleep);
     }
 }
 

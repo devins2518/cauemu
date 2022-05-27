@@ -76,7 +76,7 @@ const Cond = enum(u4) {
 const Op2 = union(enum) {
     reg: struct {
         shift_by: union(enum) {
-            imm: u4,
+            imm: u5,
             reg: Register,
         },
         shift_type: enum(u2) {
@@ -104,13 +104,12 @@ fn parseOp2(op: u32) Op2 {
             .reg = .{
                 .shift_by = blk: {
                     if (op & 0x00000010 == 1) {
-                        break :blk .{ .imm = @truncate(u4, (op & 0x00000F80) >> 7) };
+                        break :blk .{ .imm = @truncate(u5, (op & 0x00000F80) >> 7) };
                     } else {
                         std.debug.assert(op & 0x00000F00 == 0);
                         break :blk .{ .reg = @truncate(u4, (op & 0x00000F00) >> 8) };
                     }
                 },
-                // TODO: ew
                 .shift_type = @intToEnum(Field(Field(Op2, .reg), .shift_type), (op & 0x00000060) >> 5),
                 .reg = @truncate(u4, op & 0x0000000F),
             },
@@ -126,33 +125,33 @@ pub fn parseOpcode(op: u32) Instruction {
             0x1A0...0x1A8, 0x1AA, 0x1AC, 0x1AE,
             0x1B0...0x1B8, 0x1BA, 0x1BC, 0x1BE,
             0x3A0...0x3BF,
-            => .{ .mov = parseAlu(op, .mov) },
+            => .{ .mov = AluInstr.parseAlu(op, .mov) },
             0x1E0...0x1E8, 0x1EA, 0x1EC, 0x1EE,
             0x1F0...0x1F8, 0x1FA, 0x1FC, 0x1FE,
             0x3E0...0x3FF,
-            => .{ .mvn = parseAlu(op, .mvn) },
+            => .{ .mvn = AluInstr.parseAlu(op, .mvn) },
             0x180...0x188, 0x18A, 0x18C, 0x18E,
             0x190...0x198, 0x19A, 0x19C, 0x19E,
             0x380...0x39F,
-            => .{ .orr = parseAlu(op, .orr) },
+            => .{ .orr = AluInstr.parseAlu(op, .orr) },
             0x020...0x028, 0x02A, 0x02C, 0x02E,
             0x030...0x038, 0x03A, 0x03C, 0x03E,
             0x220...0x23F,
-            => .{ .eor = parseAlu(op, .eor) },
+            => .{ .eor = AluInstr.parseAlu(op, .eor) },
             0x000...0x008, 0x00A, 0x00C, 0x00E,
             0x010...0x018, 0x01A, 0x01C, 0x01E,
             0x200...0x21F,
-            => .{ .and_ = parseAlu(op, .and_) },
+            => .{ .and_ = AluInstr.parseAlu(op, .and_) },
             0x1C0...0x1C8, 0x1CA, 0x1CC, 0x1CE,
             0x1D0...0x1D8, 0x1DA, 0x1DC, 0x1DE,
             0x3C0...0x3DF,
-            => .{ .bic = parseAlu(op, .bic) },
+            => .{ .bic = AluInstr.parseAlu(op, .bic) },
             0x110...0x118, 0x11A, 0x11C, 0x11E,
             0x310...0x31F,
-            => .{ .tst = parseAlu(op, .tst) },
+            => .{ .tst = AluInstr.parseAlu(op, .tst) },
             0x130...0x138, 0x13A, 0x13C, 0x13E,
             0x330...0x33F,
-            => .{ .teq = parseAlu(op, .teq) },
+            => .{ .teq = AluInstr.parseAlu(op, .teq) },
             // zig fmt: on
 
             // Arithmetic ALU
@@ -160,49 +159,49 @@ pub fn parseOpcode(op: u32) Instruction {
             0x080...0x088, 0x08A, 0x08C, 0x08E,
             0x090...0x098, 0x09A, 0x09C, 0x09E,
             0x280...0x29F,
-            => .{ .add = parseAlu(op, .add) },
+            => .{ .add = AluInstr.parseAlu(op, .add) },
             0x0A0...0x0A8, 0x0AA, 0x0AC, 0x0AE,
             0x0B0...0x0B8, 0x0BA, 0x0BC, 0x0BE,
             0x2A0...0x2BF,
-            => .{ .adc = parseAlu(op, .adc) },
+            => .{ .adc = AluInstr.parseAlu(op, .adc) },
             0x040...0x048, 0x04A, 0x04C, 0x04E,
             0x050...0x058, 0x05A, 0x05C, 0x05E,
             0x240...0x25F,
-            => .{ .sub = parseAlu(op, .sub) },
+            => .{ .sub = AluInstr.parseAlu(op, .sub) },
             0x0C0...0x0C8, 0x0CA, 0x0CC, 0x0CE,
             0x0D0...0x0D8, 0x0DA, 0x0DC, 0x0DE,
             0x2C0...0x2DF,
-            => .{ .sbc = parseAlu(op, .sbc) },
+            => .{ .sbc = AluInstr.parseAlu(op, .sbc) },
             0x060...0x068, 0x06A, 0x06C, 0x06E,
             0x070...0x078, 0x07A, 0x07C, 0x07E,
             0x260...0x27F,
-            => .{ .rsb = parseAlu(op, .rsb) },
+            => .{ .rsb = AluInstr.parseAlu(op, .rsb) },
             0x0E0...0x0E8, 0x0EA, 0x0EC, 0x0EE,
             0x0F0...0x0F8, 0x0FA, 0x0FC, 0x0FE,
             0x2E0...0x2FF,
-            => .{ .rsc = parseAlu(op, .rsc) },
+            => .{ .rsc = AluInstr.parseAlu(op, .rsc) },
             0x150...0x158, 0x15A, 0x15C, 0x15E,
             0x350...0x35F,
-            => .{ .cmp = parseAlu(op, .cmp) },
+            => .{ .cmp = AluInstr.parseAlu(op, .cmp) },
             0x170...0x178, 0x17A, 0x17C, 0x17E,
             0x370...0x37F,
-            => .{ .cmn = parseAlu(op, .cmn) },
+            => .{ .cmn = AluInstr.parseAlu(op, .cmn) },
             // zig fmt: on
 
             //Multiply
             // zig fmt: off
             0x009, 0x019,
-            => .{ .mul = parseMul(op, .mul) },
+            => .{ .mul = MulInstr.parseMul(op, .mul) },
             0x029, 0x039,
-            => .{ .mla = parseMul(op, .mla) },
+            => .{ .mla = MulInstr.parseMul(op, .mla) },
             0x089, 0x099,
-            => .{ .umull = parseMul(op, .umull) },
+            => .{ .umull = MulInstr.parseMul(op, .umull) },
             0x0A9, 0x0B9,
-            => .{ .umlal = parseMul(op, .umlal) },
+            => .{ .umlal = MulInstr.parseMul(op, .umlal) },
             0x0C9, 0x0D9,
-            => .{ .smull = parseMul(op, .smull) },
+            => .{ .smull = MulInstr.parseMul(op, .smull) },
             0x0E9, 0x0F9,
-            => .{ .smlal = parseMul(op, .smlal) },
+            => .{ .smlal = MulInstr.parseMul(op, .smlal) },
             // zig fmt: on
 
             // Load/Store
@@ -226,12 +225,12 @@ pub fn parseOpcode(op: u32) Instruction {
             0x7B0, 0x7B2, 0x7B4, 0x7B6, 0x7B8, 0x7BA, 0x7BC, 0x7BE,
             0x7D0, 0x7D2, 0x7D4, 0x7D6, 0x7D8, 0x7DA, 0x7DC, 0x7DE,
             0x7F0, 0x7F2, 0x7F4, 0x7F6, 0x7F8, 0x7FA, 0x7FC, 0x7FE,
-            => .{ .ldr = parseSDTransfer(op, .ldr) },
+            => .{ .ldr = SDTransferInstr.parseSDTransfer(op, .ldr) },
             0x810...0x81F, 0x830...0x83F, 0x850...0x85F, 0x870...0x87F,
             0x890...0x89F, 0x8B0...0x8BF, 0x8D0...0x8DF, 0x8F0...0x8FF,
             0x910...0x91F, 0x930...0x93F, 0x950...0x95F, 0x970...0x97F,
             0x990...0x99F, 0x9B0...0x9BF, 0x9D0...0x9DF, 0x9F0...0x9FF,
-            => .{ .ldm = parseBDTransfer(op, .ldm) },
+            => .{ .ldm = BDTransferInstr.parseBDTransfer(op, .ldm) },
             0x00B, 0x00F, 0x02B, 0x02F, 0x04B, 0x04F, 0x06B, 0x06F,
             0x08B, 0x08F, 0x0AB, 0x0AF, 0x0CB, 0x0CF, 0x0EB, 0x0EF,
             0x10B, 0x10F, 0x12B, 0x12F, 0x14B, 0x14F, 0x16B, 0x16F,
@@ -256,30 +255,30 @@ pub fn parseOpcode(op: u32) Instruction {
             0x7A0, 0x7A2, 0x7A4, 0x7A6, 0x7A8, 0x7AA, 0x7AC, 0x7AE,
             0x7C0, 0x7C2, 0x7C4, 0x7C6, 0x7C8, 0x7CA, 0x7CC, 0x7CE,
             0x7E0, 0x7E2, 0x7E4, 0x7E6, 0x7E8, 0x7EA, 0x7EC, 0x7EE,
-            => .{ .str = parseSDTransfer(op, .str) },
+            => .{ .str = SDTransferInstr.parseSDTransfer(op, .str) },
             0x800...0x80F, 0x820...0x82F, 0x840...0x84F, 0x860...0x86F,
             0x880...0x88F, 0x8A0...0x8AF, 0x8C0...0x8CF, 0x8E0...0x8EF,
             0x900...0x90F, 0x920...0x92F, 0x940...0x94F, 0x960...0x96F,
             0x980...0x98F, 0x9A0...0x9AF, 0x9C0...0x9CF, 0x9E0...0x9EF,
-            => .{ .stm = parseBDTransfer(op, .stm) },
+            => .{ .stm = BDTransferInstr.parseBDTransfer(op, .stm) },
             0x109, 0x149,
-            => .{ .swp = parseSDSwap(op, .swp) },
+            => .{ .swp = SDSwapInstr.parseSDSwap(op, .swp) },
             // zig fmt: on
 
             // Load/Store
             // zig fmt: off
             0xA00...0xAFF,
-            => .{.b = parseBranch(op, .b)},
+            => .{.b = BranchInstr.parseBranch(op, .b)},
             0xB00...0xBFF,
-            => .{.bl = parseBranch(op, .bl)},
+            => .{.bl = BranchInstr.parseBranch(op, .bl)},
             0x121,
-            => .{.bx = parseBranchEx(op, .bx)},
+            => .{.bx = BranchExInstr.parseBranchEx(op, .bx)},
             0x100, 0x140,
-            => .{.mrs = parsePSRTransfer(op, .mrs)},
+            => .{.mrs = PSRTransferInstr.parsePSRTransfer(op, .mrs)},
             0x120, 0x160,
             0x320...0x32F,
             0x360...0x36F,
-            => .{.msr = parsePSRTransfer(op, .msr)},
+            => .{.msr = PSRTransferInstr.parsePSRTransfer(op, .msr)},
             0xF00...0xFFF
             => .{.swi = undefined},
             // zig fmt: on
@@ -325,27 +324,28 @@ pub const AluInstr = struct {
     rd: Register,
     rn: Register,
     op2: Op2,
+
+    fn parseAlu(op: u32, assert: AluOpcode) AluInstr {
+        std.debug.assert((op & 0x01E00000) >> 21 == @enumToInt(assert));
+        std.debug.assert((op & 0x0C000000) >> 26 == 0x0);
+        std.debug.assert((op & 0x00000040) >> 7 == 0x0);
+        const s = ((op & 0x00200000) >> 20) == 1;
+        const rn = @truncate(u4, (op & 0x000F0000) >> 16);
+        const rd = @truncate(u4, (op & 0x0000F000) >> 12);
+        const op2 = parseOp2(op);
+        if (assert == .mov or assert == .mvn)
+            std.debug.assert(rn == 0x0)
+        else if (assert == .cmp or assert == .cmn or assert == .tst or assert == .teq)
+            std.debug.assert(rd == 0x0);
+        return .{
+            .s = s,
+            .op = assert,
+            .rd = rd,
+            .rn = rn,
+            .op2 = op2,
+        };
+    }
 };
-fn parseAlu(op: u32, assert: AluOpcode) AluInstr {
-    std.debug.assert((op & 0x01E00000) >> 21 == @enumToInt(assert));
-    std.debug.assert((op & 0x0C000000) >> 26 == 0x0);
-    std.debug.assert((op & 0x00000040) >> 7 == 0x0);
-    const s = ((op & 0x00200000) >> 20) == 1;
-    const rn = @truncate(u4, (op & 0x000F0000) >> 16);
-    const rd = @truncate(u4, (op & 0x0000F000) >> 12);
-    const op2 = parseOp2(op);
-    if (assert == .mov or assert == .mvn)
-        std.debug.assert(rn == 0x0)
-    else if (assert == .cmp or assert == .cmn or assert == .tst or assert == .teq)
-        std.debug.assert(rd == 0x0);
-    return .{
-        .s = s,
-        .op = assert,
-        .rd = rd,
-        .rn = rn,
-        .op2 = op2,
-    };
-}
 
 pub const MulOpcode = enum(u8) {
     mul = 0x0,
@@ -362,25 +362,26 @@ pub const MulInstr = struct {
     rn: Register, // RdLo
     rs: Register,
     rm: Register,
+
+    fn parseMul(op: u32, assert: MulOpcode) MulInstr {
+        std.debug.assert((op & 0x01E00000) >> 21 == @enumToInt(assert));
+        std.debug.assert((op & 0x0E000000) >> 25 == 0b000);
+        std.debug.assert((op & 0x000000F0) >> 4 == 0b1001);
+        const s = ((op & 0x00200000) >> 20) == 1;
+        const rd = @truncate(u4, (op & 0x000F0000) >> 16);
+        const rn = @truncate(u4, (op & 0x0000F000) >> 16);
+        const rs = @truncate(u4, (op & 0x00000F00) >> 16);
+        const rm = @truncate(u4, (op & 0x0000000F) >> 16);
+        return .{
+            .s = s,
+            .op = assert,
+            .rd = rd,
+            .rn = rn,
+            .rs = rs,
+            .rm = rm,
+        };
+    }
 };
-fn parseMul(op: u32, assert: MulOpcode) MulInstr {
-    std.debug.assert((op & 0x01E00000) >> 21 == @enumToInt(assert));
-    std.debug.assert((op & 0x0E000000) >> 25 == 0b000);
-    std.debug.assert((op & 0x000000F0) >> 4 == 0b1001);
-    const s = ((op & 0x00200000) >> 20) == 1;
-    const rd = @truncate(u4, (op & 0x000F0000) >> 16);
-    const rn = @truncate(u4, (op & 0x0000F000) >> 16);
-    const rs = @truncate(u4, (op & 0x00000F00) >> 16);
-    const rm = @truncate(u4, (op & 0x0000000F) >> 16);
-    return .{
-        .s = s,
-        .op = assert,
-        .rd = rd,
-        .rn = rn,
-        .rs = rs,
-        .rm = rm,
-    };
-}
 
 const SDTransferOpcode = enum(u2) {
     str = 0x0,
@@ -406,37 +407,38 @@ pub const SDTransferInstr = struct {
             rm: Register,
         },
     },
+
+    fn parseSDTransfer(op: u32, assert: SDTransferOpcode) SDTransferInstr {
+        std.debug.assert((op & 0x04000000) >> 26 == 0b01);
+        std.debug.assert((op & 0x00100000) >> 20 == @enumToInt(assert));
+        const when = @intToEnum(Field(SDTransferInstr, .when), (op & 0x01000000) >> 24);
+        const base_op = @intToEnum(Field(SDTransferInstr, .base_op), (op & 0x00800000) >> 23);
+        const size = @intToEnum(Field(SDTransferInstr, .size), (op & 0x00400000) >> 22);
+        const rn = @truncate(u4, (op & 0x000F0000) >> 16);
+        const rd = @truncate(u4, (op & 0x0000F000) >> 16);
+        const offset = blk: {
+            if ((op & 0x02000000) >> 20 == 0b0) {
+                break :blk Field(SDTransferInstr, .offset){ .imm = (@truncate(u12, op & 0x00000FFF)) };
+            } else {
+                std.debug.assert((op & 0x00000008) >> 4 == 0b0);
+                break :blk Field(SDTransferInstr, .offset){ .reg = .{
+                    .shift_amt = @truncate(u5, (op & 0x00000F80) >> 7),
+                    .shift_type = @intToEnum(Field(Field(Field(SDTransferInstr, .offset), .reg), .shift_type), (op & 0x00000F80) >> 7),
+                    .rm = @truncate(u4, op & 0x0000000F),
+                } };
+            }
+        };
+        return .{
+            .when = when,
+            .base_op = base_op,
+            .size = size,
+            .op = assert,
+            .rn = rn,
+            .rd = rd,
+            .offset = offset,
+        };
+    }
 };
-fn parseSDTransfer(op: u32, assert: SDTransferOpcode) SDTransferInstr {
-    std.debug.assert((op & 0x04000000) >> 26 == 0b01);
-    std.debug.assert((op & 0x00100000) >> 20 == @enumToInt(assert));
-    const when = @intToEnum(Field(SDTransferInstr, .when), (op & 0x01000000) >> 24);
-    const base_op = @intToEnum(Field(SDTransferInstr, .base_op), (op & 0x00800000) >> 23);
-    const size = @intToEnum(Field(SDTransferInstr, .size), (op & 0x00400000) >> 22);
-    const rn = @truncate(u4, (op & 0x000F0000) >> 16);
-    const rd = @truncate(u4, (op & 0x0000F000) >> 16);
-    const offset = blk: {
-        if ((op & 0x02000000) >> 20 == 0b0) {
-            break :blk Field(SDTransferInstr, .offset){ .imm = (@truncate(u12, op & 0x00000FFF)) };
-        } else {
-            std.debug.assert((op & 0x00000008) >> 4 == 0b0);
-            break :blk Field(SDTransferInstr, .offset){ .reg = .{
-                .shift_amt = @truncate(u5, (op & 0x00000F80) >> 7),
-                .shift_type = @intToEnum(Field(Field(Field(SDTransferInstr, .offset), .reg), .shift_type), (op & 0x00000F80) >> 7),
-                .rm = @truncate(u4, op & 0x0000000F),
-            } };
-        }
-    };
-    return .{
-        .when = when,
-        .base_op = base_op,
-        .size = size,
-        .op = assert,
-        .rn = rn,
-        .rd = rd,
-        .offset = offset,
-    };
-}
 
 const BDTransferOpcode = enum(u2) {
     stm = 0x0,
@@ -450,31 +452,32 @@ pub const BDTransferInstr = struct {
     op: BDTransferOpcode,
     rn: Register,
     reg_list: [4]Register,
+
+    fn parseBDTransfer(op: u32, assert: BDTransferOpcode) BDTransferInstr {
+        std.debug.assert((op & 0x0E000000) >> 25 == 0b100);
+        std.debug.assert((op & 0x00100000) >> 20 == @enumToInt(assert));
+        const when = @intToEnum(Field(BDTransferInstr, .when), (op & 0x01000000) >> 24);
+        const base_op = @intToEnum(Field(BDTransferInstr, .base_op), (op & 0x00800000) >> 23);
+        const force_user = @intToEnum(Field(BDTransferInstr, .force_user), (op & 0x00400000) >> 22);
+        const write_back = @intToEnum(Field(BDTransferInstr, .write_back), (op & 0x00200000) >> 21);
+        const rn = @truncate(u4, (op & 0x000F0000) >> 16);
+        const reg_list = [4]Register{
+            @truncate(u4, op & 0x0000F000 >> 12),
+            @truncate(u4, op & 0x00000F00 >> 8),
+            @truncate(u4, op & 0x000000F0 >> 4),
+            @truncate(u4, op & 0x0000000F),
+        };
+        return .{
+            .when = when,
+            .base_op = base_op,
+            .force_user = force_user,
+            .write_back = write_back,
+            .op = assert,
+            .rn = rn,
+            .reg_list = reg_list,
+        };
+    }
 };
-fn parseBDTransfer(op: u32, assert: BDTransferOpcode) BDTransferInstr {
-    std.debug.assert((op & 0x0E000000) >> 25 == 0b100);
-    std.debug.assert((op & 0x00100000) >> 20 == @enumToInt(assert));
-    const when = @intToEnum(Field(BDTransferInstr, .when), (op & 0x01000000) >> 24);
-    const base_op = @intToEnum(Field(BDTransferInstr, .base_op), (op & 0x00800000) >> 23);
-    const force_user = @intToEnum(Field(BDTransferInstr, .force_user), (op & 0x00400000) >> 22);
-    const write_back = @intToEnum(Field(BDTransferInstr, .write_back), (op & 0x00200000) >> 21);
-    const rn = @truncate(u4, (op & 0x000F0000) >> 16);
-    const reg_list = [4]Register{
-        @truncate(u4, op & 0x0000F000 >> 12),
-        @truncate(u4, op & 0x00000F00 >> 8),
-        @truncate(u4, op & 0x000000F0 >> 4),
-        @truncate(u4, op & 0x0000000F),
-    };
-    return .{
-        .when = when,
-        .base_op = base_op,
-        .force_user = force_user,
-        .write_back = write_back,
-        .op = assert,
-        .rn = rn,
-        .reg_list = reg_list,
-    };
-}
 
 const SDSwapOpcode = enum(u5) { swp = 0b00010 };
 pub const SDSwapInstr = struct {
@@ -483,45 +486,48 @@ pub const SDSwapInstr = struct {
     rn: Register,
     rd: Register,
     rm: Register,
-};
-fn parseSDSwap(op: u32, assert: SDSwapOpcode) SDSwapInstr {
-    std.debug.assert((op & 0x0F800000) >> 23 == @enumToInt(assert));
-    std.debug.assert((op & 0x00300000) >> 20 == 0b00);
-    std.debug.assert((op & 0x00000FF0) >> 4 == 0b00001001);
-    const size = @intToEnum(Field(SDSwapInstr, .size), (op & 0x00400000) >> 22);
-    const rn = @truncate(u4, (op & 0x0000F000) >> 16);
-    const rd = @truncate(u4, (op & 0x00000F00) >> 12);
-    const rm = @truncate(u4, op & 0x0000000F);
-    return .{
-        .size = size,
-        .op = assert,
-        .rn = rn,
-        .rd = rd,
-        .rm = rm,
-    };
-}
 
-const BranchOpcode = enum(u1) { b = 0b0, bl = 0b1 };
+    fn parseSDSwap(op: u32, assert: SDSwapOpcode) SDSwapInstr {
+        std.debug.assert((op & 0x0F800000) >> 23 == @enumToInt(assert));
+        std.debug.assert((op & 0x00300000) >> 20 == 0b00);
+        std.debug.assert((op & 0x00000FF0) >> 4 == 0b00001001);
+        const size = @intToEnum(Field(SDSwapInstr, .size), (op & 0x00400000) >> 22);
+        const rn = @truncate(u4, (op & 0x0000F000) >> 16);
+        const rd = @truncate(u4, (op & 0x00000F00) >> 12);
+        const rm = @truncate(u4, op & 0x0000000F);
+        return .{
+            .size = size,
+            .op = assert,
+            .rn = rn,
+            .rd = rd,
+            .rm = rm,
+        };
+    }
+};
+
+pub const BranchOpcode = enum(u1) { b = 0b0, bl = 0b1 };
 pub const BranchInstr = struct {
     op: BranchOpcode,
-    offset: u24,
+    offset: i24,
+
+    fn parseBranch(op: u32, assert: BranchOpcode) BranchInstr {
+        std.debug.assert((op & 0x0E000000) >> 25 == 0b0101);
+        std.debug.assert((op & 0x01000000) >> 24 == @enumToInt(assert));
+        return .{ .op = assert, .offset = @bitCast(i24, @truncate(u24, op & 0x00FFFFFF)) };
+    }
 };
-fn parseBranch(op: u32, assert: BranchOpcode) BranchInstr {
-    std.debug.assert((op & 0x0E000000) >> 25 == 0b0101);
-    std.debug.assert((op & 0x01000000) >> 24 == @enumToInt(assert));
-    return .{ .op = assert, .offset = @truncate(u24, op & 0x00FFFFFF) };
-}
 
 const BranchExOpcode = enum(u4) { bx = 0b0001 };
 const BranchExInstr = struct {
     op: BranchExOpcode,
     reg: Register,
+
+    fn parseBranchEx(op: u32, assert: BranchExOpcode) BranchExInstr {
+        std.debug.assert((op & 0x0FFFFF00) >> 8 == 0x12FFF);
+        std.debug.assert((op & 0x000000F0) >> 4 == @enumToInt(assert));
+        return .{ .op = assert, .reg = @truncate(u4, op & 0x0000000F) };
+    }
 };
-fn parseBranchEx(op: u32, assert: BranchExOpcode) BranchExInstr {
-    std.debug.assert((op & 0x0FFFFF00) >> 8 == 0x12FFF);
-    std.debug.assert((op & 0x000000F0) >> 4 == @enumToInt(assert));
-    return .{ .op = assert, .reg = @truncate(u4, op & 0x0000000F) };
-}
 
 const PSRTransferOpcode = enum(u2) { mrs = 0b0, msr = 0b1 };
 const PSRTransferInstr = struct {
@@ -546,56 +552,57 @@ const PSRTransferInstr = struct {
             },
         },
     },
+
+    fn parsePSRTransfer(op: u32, assert: PSRTransferOpcode) PSRTransferInstr {
+        std.debug.assert((op & 0x0C000000) >> 26 == 0b00);
+        std.debug.assert((op & 0x01000000) >> 23 == 0b10);
+        std.debug.assert((op & 0x00200000) >> 21 == @enumToInt(assert));
+        std.debug.assert((op & 0x00100000) >> 20 == 0b0);
+        const source = @intToEnum(Field(PSRTransferInstr, .source), (op & 0x00400000) >> 22);
+        const payload = blk: {
+            switch (assert) {
+                .mrs => {
+                    std.debug.assert((op & 0x000F0000) >> 16 == 0xF);
+                    std.debug.assert(op & 0x00000FFF == 0x000);
+                    const rd = @truncate(u4, (op & 0x0000F000) >> 12);
+                    break :blk Field(PSRTransferInstr, .payload){ .mrs = .{
+                        .rd = rd,
+                    } };
+                },
+                .msr => {
+                    std.debug.assert((op & 0x0000F000) >> 12 == 0xF);
+                    const write_f = (op & 0x00080000) >> 19 == 1;
+                    const write_s = (op & 0x00040000) >> 18 == 1;
+                    const write_x = (op & 0x00020000) >> 17 == 1;
+                    const write_c = (op & 0x00010000) >> 16 == 1;
+                    const src = src: {
+                        if ((op & 0x02000000) >> 25 == 0b1) {
+                            break :src Field(Field(Field(PSRTransferInstr, .payload), .msr), .src){
+                                .imm = .{
+                                    .shift_by = @truncate(u4, (op & 0x00000F00) >> 8),
+                                    .imm = @truncate(u8, op & 0x000000FF),
+                                },
+                            };
+                        } else {
+                            std.debug.assert((op & 0x00000FF0) >> 4 == 0x00);
+                            break :src Field(Field(Field(PSRTransferInstr, .payload), .msr), .src){
+                                .reg = @truncate(u4, op & 0x0000000F),
+                            };
+                        }
+                    };
+                    break :blk Field(PSRTransferInstr, .payload){ .msr = .{
+                        .write_f = write_f,
+                        .write_s = write_s,
+                        .write_x = write_x,
+                        .write_c = write_c,
+                        .src = src,
+                    } };
+                },
+            }
+        };
+        return .{ .op = assert, .source = source, .payload = payload };
+    }
 };
-fn parsePSRTransfer(op: u32, assert: PSRTransferOpcode) PSRTransferInstr {
-    std.debug.assert((op & 0x0C000000) >> 26 == 0b00);
-    std.debug.assert((op & 0x01000000) >> 23 == 0b10);
-    std.debug.assert((op & 0x00200000) >> 21 == @enumToInt(assert));
-    std.debug.assert((op & 0x00100000) >> 20 == 0b0);
-    const source = @intToEnum(Field(PSRTransferInstr, .source), (op & 0x00400000) >> 22);
-    const payload = blk: {
-        switch (assert) {
-            .mrs => {
-                std.debug.assert((op & 0x000F0000) >> 16 == 0xF);
-                std.debug.assert(op & 0x00000FFF == 0x000);
-                const rd = @truncate(u4, (op & 0x0000F000) >> 12);
-                break :blk Field(PSRTransferInstr, .payload){ .mrs = .{
-                    .rd = rd,
-                } };
-            },
-            .msr => {
-                std.debug.assert((op & 0x0000F000) >> 12 == 0xF);
-                const write_f = (op & 0x00080000) >> 19 == 1;
-                const write_s = (op & 0x00040000) >> 18 == 1;
-                const write_x = (op & 0x00020000) >> 17 == 1;
-                const write_c = (op & 0x00010000) >> 16 == 1;
-                const src = src: {
-                    if ((op & 0x02000000) >> 25 == 0b1) {
-                        break :src Field(Field(Field(PSRTransferInstr, .payload), .msr), .src){
-                            .imm = .{
-                                .shift_by = @truncate(u4, (op & 0x00000F00) >> 8),
-                                .imm = @truncate(u8, op & 0x000000FF),
-                            },
-                        };
-                    } else {
-                        std.debug.assert((op & 0x00000FF0) >> 4 == 0x00);
-                        break :src Field(Field(Field(PSRTransferInstr, .payload), .msr), .src){
-                            .reg = @truncate(u4, op & 0x0000000F),
-                        };
-                    }
-                };
-                break :blk Field(PSRTransferInstr, .payload){ .msr = .{
-                    .write_f = write_f,
-                    .write_s = write_s,
-                    .write_x = write_x,
-                    .write_c = write_c,
-                    .src = src,
-                } };
-            },
-        }
-    };
-    return .{ .op = assert, .source = source, .payload = payload };
-}
 
 test "static analysis" {
     std.testing.refAllDecls(@This());

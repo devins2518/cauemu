@@ -131,6 +131,10 @@ pub fn init(bus: *Bus) Self {
     };
 }
 
+pub fn clock(self: *Self) void {
+    _ = self;
+}
+
 pub fn deinit(self: Self) void {
     _ = self;
 }

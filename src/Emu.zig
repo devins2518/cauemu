@@ -24,6 +24,11 @@ pub fn init() Self {
     return .{ .bus = bus, .cpu = cpu, .ppu = ppu };
 }
 
+pub fn clock(self: *Self) void {
+    self.cpu.clock();
+    self.ppu.clock();
+}
+
 pub fn deinit(self: Self) void {
     self.bus.deinit();
     self.cpu.deinit();
