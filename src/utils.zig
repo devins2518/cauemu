@@ -14,6 +14,12 @@ pub fn sdlPanic() noreturn {
     std.process.exit(1);
 }
 
+pub fn prefetchWarn() void {
+    std.log.warn(
+        \\\ALU operation using R15 as operand, result may be invalid due to prefetching.
+    , .{});
+}
+
 test "static analysis" {
     std.testing.refAllDecls(@This());
 }

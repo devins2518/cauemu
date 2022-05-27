@@ -1,5 +1,6 @@
 const std = @import("std");
 const instr = @import("instr.zig");
+const utils = @import("utils.zig");
 const Bus = @import("Bus.zig");
 const Self = @This();
 
@@ -147,11 +148,13 @@ pub fn clock(self: *Self) void {
 
 // Logical/Arithmetic Alu
 fn alu(self: *Self, payload: instr.AluInstr) void {
-    // TODO
+    if (payload.rn == PC) utils.prefetchWarn();
+    if (payload.rd == PC) utils.prefetchWarn();
     const op2: struct { val: u32, carry: bool } = blk: {
         switch (payload.op2) {
             .reg => |s| {
                 const rm = self.getReg(s.reg);
+                if (rm == PC) utils.prefetchWarn();
                 switch (s.shift_by) {
                     // LSL#0
                     .imm => |imm| {
@@ -179,6 +182,7 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
                         }
                     },
                     .reg => |rs| {
+                        if (rs == PC) utils.prefetchWarn();
                         const shift = @truncate(u8, self.getReg(rs));
                         const shift_u5 = @truncate(u5, shift);
                         switch (s.shift_type) {
