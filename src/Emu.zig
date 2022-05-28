@@ -10,18 +10,22 @@ const Self = @This();
 
 const ClocksPerSec = 16780000;
 
-bus: Bus,
-cpu: Cpu,
-ppu: Ppu,
+alloc: std.mem.Allocator,
 
-pub fn init() Self {
-    var bus = Bus.init();
-    const cpu = Cpu.init();
-    const ppu = Ppu.init(&bus);
+bus: *Bus,
+cpu: *Cpu,
+ppu: *Ppu,
+
+pub fn init() !Self {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var alloc = gpa.allocator();
+    var bus = try Bus.init(&alloc);
+    const cpu = try Cpu.init(&alloc, bus);
+    const ppu = try Ppu.init(&alloc, bus);
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) utils.sdlPanic();
 
-    return .{ .bus = bus, .cpu = cpu, .ppu = ppu };
+    return Self{ .alloc = alloc, .bus = bus, .cpu = cpu, .ppu = ppu };
 }
 
 pub fn clock(self: *Self) void {
@@ -31,8 +35,11 @@ pub fn clock(self: *Self) void {
 
 pub fn deinit(self: Self) void {
     self.bus.deinit();
+    self.alloc.destroy(self.bus);
     self.cpu.deinit();
+    self.alloc.destroy(self.cpu);
     self.ppu.deinit();
+    self.alloc.destroy(self.ppu);
 }
 
 test "static analysis" {

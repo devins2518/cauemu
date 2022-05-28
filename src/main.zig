@@ -13,7 +13,7 @@ const NSECS_PER_CLOCK = @as(
 );
 
 pub fn main() anyerror!void {
-    var gba = Emu.init();
+    var gba = try Emu.init();
     defer gba.deinit();
 
     var timer = try std.time.Timer.start();

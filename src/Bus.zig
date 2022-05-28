@@ -1,4 +1,6 @@
 const std = @import("std");
+const utils = @import("utils.zig");
+const alignedCreate = utils.alignedCreate;
 const Self = @This();
 
 const BIOS_FILE = @embedFile("../gba.bin");
@@ -25,25 +27,33 @@ const OAM_START = 0x07000000;
 const OAM_END = 0x070003FF;
 const OAM_SIZE = OAM_END - OAM_START + 1;
 
-// TODO allocate to avoid ptr invalidation
-bios: [BIOS_SIZE]u8,
-wram_ob: [WRAM_OB_SIZE]u8,
-wram_oc: [WRAM_OC_SIZE]u8,
-io: [IO_SIZE]u8,
-pal: [PAL_SIZE]u8,
-vram: [VRAM_SIZE]u8,
-oam: [OAM_SIZE]u8,
+pub const wordAlign = @alignOf(u32);
+pub const halfWordAlign = @alignOf(u16);
+pub const byteAlign = @alignOf(u8);
 
-pub fn init() Self {
-    var bios = [_]u8{undefined} ** BIOS_SIZE;
-    @memcpy(&bios, BIOS_FILE, BIOS_SIZE);
-    const wram_ob = [_]u8{undefined} ** WRAM_OB_SIZE;
-    const wram_oc = [_]u8{undefined} ** WRAM_OC_SIZE;
-    const io = [_]u8{undefined} ** IO_SIZE;
-    const pal = [_]u8{undefined} ** PAL_SIZE;
-    const vram = [_]u8{undefined} ** VRAM_SIZE;
-    const oam = [_]u8{undefined} ** OAM_SIZE;
-    return .{
+bios: *align(wordAlign) [BIOS_SIZE]u8,
+wram_ob: *align(wordAlign) [WRAM_OB_SIZE]u8,
+wram_oc: *align(wordAlign) [WRAM_OC_SIZE]u8,
+io: *align(wordAlign) [IO_SIZE]u8,
+pal: *align(wordAlign) [PAL_SIZE]u8,
+vram: *align(wordAlign) [VRAM_SIZE]u8,
+oam: *align(wordAlign) [OAM_SIZE]u8,
+
+alloc: *std.mem.Allocator,
+
+pub fn init(alloc: *std.mem.Allocator) !*Self {
+    var bios = try alignedCreate(alloc, [BIOS_SIZE]u8, wordAlign);
+    const wram_ob = try alignedCreate(alloc, [WRAM_OB_SIZE]u8, wordAlign);
+    const wram_oc = try alignedCreate(alloc, [WRAM_OC_SIZE]u8, wordAlign);
+    const io = try alignedCreate(alloc, [IO_SIZE]u8, wordAlign);
+    const pal = try alignedCreate(alloc, [PAL_SIZE]u8, wordAlign);
+    const vram = try alignedCreate(alloc, [VRAM_SIZE]u8, wordAlign);
+    const oam = try alignedCreate(alloc, [OAM_SIZE]u8, wordAlign);
+
+    @memcpy(bios, BIOS_FILE, BIOS_SIZE);
+
+    var self = try alloc.create(Self);
+    self.* = .{
         .bios = bios,
         .wram_ob = wram_ob,
         .wram_oc = wram_oc,
@@ -51,39 +61,51 @@ pub fn init() Self {
         .pal = pal,
         .vram = vram,
         .oam = oam,
+        .alloc = alloc,
     };
+    return self;
 }
 
 pub fn deinit(self: Self) void {
-    _ = self;
+    self.alloc.destroy(self.bios);
+    self.alloc.destroy(self.wram_ob);
+    self.alloc.destroy(self.wram_oc);
+    self.alloc.destroy(self.io);
+    self.alloc.destroy(self.pal);
+    self.alloc.destroy(self.vram);
+    self.alloc.destroy(self.oam);
 }
 
 pub fn readByte(self: *Self, addr: u32) u8 {
-    return self.getAddr(addr).*;
+    return self.getAddr(addr, byteAlign).*;
 }
 pub fn readHalfWord(self: *Self, addr: u32) u16 {
-    return @intCast(u16, self.getAddr(addr + 1).*) << 8 |
-        @intCast(u16, self.getAddr(addr).*);
+    const ptr = @ptrCast(*u16, self.getAddr(addr, halfWordAlign));
+    return std.mem.readIntLittle(u16, @ptrCast(*[2]u8, ptr));
 }
 pub fn readWord(self: *Self, addr: u32) u32 {
-    return @intCast(u32, self.getAddr(addr + 3).*) << 24 |
-        @intCast(u32, self.getAddr(addr + 2).*) << 16 |
-        @intCast(u32, self.getAddr(addr + 1).*) << 8 |
-        @intCast(u32, self.getAddr(addr).*);
+    const ptr = @ptrCast(*u32, self.getAddr(addr, wordAlign));
+    return std.mem.readIntLittle(u32, @ptrCast(*[4]u8, ptr));
 }
 
 pub fn writeByte(self: *Self, addr: u32, n: u8) void {
-    self.getAddr(addr).* = n;
+    self.getAddr(addr, byteAlign).* = n;
 }
 pub fn writeHalfWord(self: *Self, addr: u32, n: u16) void {
-    @ptrCast(*u16, @alignCast(@alignOf(*u16), self.getAddr(addr))).* = n;
+    const ptr = @ptrCast(*u16, self.getAddr(addr, halfWordAlign));
+    std.mem.writeIntNative(u16, @ptrCast(*[2]u8, ptr), n);
 }
 pub fn writeWord(self: *Self, addr: u32, n: u32) void {
-    @ptrCast(*u32, @alignCast(@alignOf(*u32), self.getAddr(addr))).* = n;
+    const ptr = @ptrCast(*u32, self.getAddr(addr, wordAlign));
+    std.mem.writeIntNative(u32, @ptrCast(*[4]u8, ptr), n);
 }
 
-pub fn getAddr(self: *Self, addr: u32) *u8 {
-    return switch (addr) {
+pub fn getAddr(
+    self: *Self,
+    addr: u32,
+    comptime alignment: ?u29,
+) *align(alignment orelse byteAlign) u8 {
+    const ptr = switch (addr) {
         0x00000000...0x00003FFF => &self.bios[addr],
         0x02000000...0x0203FFFF => &self.wram_ob[@mod(addr, WRAM_OB_START)],
         0x03000000...0x03007FFF => &self.wram_oc[@mod(addr, WRAM_OC_START)],
@@ -93,6 +115,7 @@ pub fn getAddr(self: *Self, addr: u32) *u8 {
         0x07000000...0x070003FF => &self.oam[@mod(addr, OAM_START)],
         else => std.debug.todo("Attempted to access unused memory region."),
     };
+    return @alignCast(alignment orelse byteAlign, ptr);
 }
 
 test "static analysis" {
@@ -107,4 +130,26 @@ test "memory sizes" {
     try std.testing.expect(PAL_SIZE == 0x000000400);
     try std.testing.expect(VRAM_SIZE == 0x000018000);
     try std.testing.expect(OAM_SIZE == 0x000000400);
+}
+
+test "using memory" {
+    var alloc = std.heap.GeneralPurposeAllocator(.{}){};
+    var bus = try Self.init(&alloc.allocator());
+
+    bus.writeWord(0x0, 0xCAFE0000);
+    std.debug.assert(bus.readWord(0x0) == 0xCAFE0000);
+    std.debug.assert(std.mem.eql(u8, bus.bios[0..4], &[_]u8{ 0x00, 0x00, 0xFE, 0xCA }));
+
+    bus.writeHalfWord(0x4, 0xBEEF);
+    std.debug.assert(bus.readHalfWord(0x4) == 0xBEEF);
+    std.debug.assert(std.mem.eql(u8, bus.bios[4..6], &[_]u8{ 0xEF, 0xBE }));
+
+    bus.writeByte(0x6, 0xAD);
+    std.debug.assert(bus.readByte(0x6) == 0xAD);
+    std.debug.assert(std.mem.eql(u8, bus.bios[6..7], &[_]u8{0xAD}));
+
+    const ptr = @ptrCast(*u56, bus.getAddr(0x0, @alignOf(u56)));
+    const adbeefcafe0000 = std.mem.readIntLittle(u56, @ptrCast(*[7]u8, ptr));
+    std.debug.assert(adbeefcafe0000 == 0xADBEEFCAFE0000);
+    std.debug.assert(std.mem.eql(u8, bus.bios[0..7], &[_]u8{ 0x00, 0x00, 0xFE, 0xCA, 0xEF, 0xBE, 0xAD }));
 }

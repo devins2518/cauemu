@@ -20,6 +20,17 @@ pub fn prefetchWarn() void {
     , .{});
 }
 
+pub fn alignedCreate(
+    self: *std.mem.Allocator,
+    comptime T: type,
+    // null means naturally aligned
+    comptime alignment: ?u29,
+) std.mem.Allocator.Error!*align(alignment orelse @alignOf(T)) T {
+    if (@sizeOf(T) == 0) return @as(*T, undefined);
+    const slice = try self.allocAdvancedWithRetAddr(T, alignment, 1, .exact, @returnAddress());
+    return &slice[0];
+}
+
 test "static analysis" {
     std.testing.refAllDecls(@This());
 }

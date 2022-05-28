@@ -111,24 +111,26 @@ bg_scroll: *packed struct {
     ________: u8,
 },
 
-pub fn init(bus: *Bus) Self {
+pub fn init(alloc: *std.mem.Allocator, bus: *Bus) !*Self {
     var window: ?*sdl.SDL_Window = undefined;
     var renderer: ?*sdl.SDL_Renderer = undefined;
     if (sdl.SDL_CreateWindowAndRenderer(Width, Height, 0, &window, &renderer) != 0)
         utils.sdlPanic();
-    return .{
+    const self = try alloc.create(Self);
+    self.* = .{
         .window = window.?,
         .renderer = renderer.?,
-        .lcdc = @ptrCast(utils.Field(Self, .lcdc), bus.getAddr(LCDCAddr)),
-        .green_swap = @ptrCast(utils.Field(Self, .green_swap), bus.getAddr(GreenSwapAddr)),
-        .lcds = @ptrCast(utils.Field(Self, .lcds), bus.getAddr(LCDCAddr)),
-        .vcounter = @ptrCast(utils.Field(Self, .vcounter), bus.getAddr(VCounterAddr)),
-        .bg0_control = @ptrCast(*BGControl, bus.getAddr(Bg0ControlAddr)),
-        .bg1_control = @ptrCast(*BGControl, bus.getAddr(Bg1ControlAddr)),
-        .bg2_control = @ptrCast(*BGControl, bus.getAddr(Bg2ControlAddr)),
-        .bg3_control = @ptrCast(*BGControl, bus.getAddr(Bg3ControlAddr)),
-        .bg_scroll = @ptrCast(utils.Field(Self, .bg_scroll), bus.getAddr(BgScrollAddr)),
+        .lcdc = @ptrCast(utils.Field(Self, .lcdc), bus.getAddr(LCDCAddr, Bus.halfWordAlign)),
+        .green_swap = @ptrCast(utils.Field(Self, .green_swap), bus.getAddr(GreenSwapAddr, Bus.halfWordAlign)),
+        .lcds = @ptrCast(utils.Field(Self, .lcds), bus.getAddr(LCDCAddr, Bus.halfWordAlign)),
+        .vcounter = @ptrCast(utils.Field(Self, .vcounter), bus.getAddr(VCounterAddr, Bus.halfWordAlign)),
+        .bg0_control = @ptrCast(*BGControl, bus.getAddr(Bg0ControlAddr, Bus.halfWordAlign)),
+        .bg1_control = @ptrCast(*BGControl, bus.getAddr(Bg1ControlAddr, Bus.halfWordAlign)),
+        .bg2_control = @ptrCast(*BGControl, bus.getAddr(Bg2ControlAddr, Bus.halfWordAlign)),
+        .bg3_control = @ptrCast(*BGControl, bus.getAddr(Bg3ControlAddr, Bus.halfWordAlign)),
+        .bg_scroll = @ptrCast(utils.Field(Self, .bg_scroll), bus.getAddr(BgScrollAddr, Bus.halfWordAlign)),
     };
+    return self;
 }
 
 pub fn clock(self: *Self) void {
