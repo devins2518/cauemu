@@ -39,16 +39,14 @@ pal: *align(wordAlign) [PAL_SIZE]u8,
 vram: *align(wordAlign) [VRAM_SIZE]u8,
 oam: *align(wordAlign) [OAM_SIZE]u8,
 
-alloc: *std.mem.Allocator,
-
 pub fn init(alloc: *std.mem.Allocator) !*Self {
-    var bios = try alignedCreate(alloc, [BIOS_SIZE]u8, wordAlign);
-    const wram_ob = try alignedCreate(alloc, [WRAM_OB_SIZE]u8, wordAlign);
-    const wram_oc = try alignedCreate(alloc, [WRAM_OC_SIZE]u8, wordAlign);
-    const io = try alignedCreate(alloc, [IO_SIZE]u8, wordAlign);
-    const pal = try alignedCreate(alloc, [PAL_SIZE]u8, wordAlign);
-    const vram = try alignedCreate(alloc, [VRAM_SIZE]u8, wordAlign);
-    const oam = try alignedCreate(alloc, [OAM_SIZE]u8, wordAlign);
+    var bios = try alignedCreate(alloc.*, [BIOS_SIZE]u8, wordAlign);
+    const wram_ob = try alignedCreate(alloc.*, [WRAM_OB_SIZE]u8, wordAlign);
+    const wram_oc = try alignedCreate(alloc.*, [WRAM_OC_SIZE]u8, wordAlign);
+    const io = try alignedCreate(alloc.*, [IO_SIZE]u8, wordAlign);
+    const pal = try alignedCreate(alloc.*, [PAL_SIZE]u8, wordAlign);
+    const vram = try alignedCreate(alloc.*, [VRAM_SIZE]u8, wordAlign);
+    const oam = try alignedCreate(alloc.*, [OAM_SIZE]u8, wordAlign);
 
     @memcpy(bios, BIOS_FILE, BIOS_SIZE);
 
@@ -61,19 +59,18 @@ pub fn init(alloc: *std.mem.Allocator) !*Self {
         .pal = pal,
         .vram = vram,
         .oam = oam,
-        .alloc = alloc,
     };
     return self;
 }
 
-pub fn deinit(self: Self) void {
-    self.alloc.destroy(self.bios);
-    self.alloc.destroy(self.wram_ob);
-    self.alloc.destroy(self.wram_oc);
-    self.alloc.destroy(self.io);
-    self.alloc.destroy(self.pal);
-    self.alloc.destroy(self.vram);
-    self.alloc.destroy(self.oam);
+pub fn deinit(self: *Self, alloc: *std.mem.Allocator) void {
+    alloc.destroy(self.bios);
+    alloc.destroy(self.wram_ob);
+    alloc.destroy(self.wram_oc);
+    alloc.destroy(self.io);
+    alloc.destroy(self.pal);
+    alloc.destroy(self.vram);
+    alloc.destroy(self.oam);
 }
 
 pub fn readByte(self: *Self, addr: u32) u8 {

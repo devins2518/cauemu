@@ -21,7 +21,7 @@ pub fn prefetchWarn() void {
 }
 
 pub fn alignedCreate(
-    self: *std.mem.Allocator,
+    self: std.mem.Allocator,
     comptime T: type,
     // null means naturally aligned
     comptime alignment: ?u29,

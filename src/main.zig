@@ -30,6 +30,8 @@ pub fn main() anyerror!void {
         var sleep = timer.previous.since(timer.started);
         std.time.sleep(NSECS_PER_CLOCK -| sleep);
     }
+
+    std.process.exit(0);
 }
 
 test "static analysis" {
