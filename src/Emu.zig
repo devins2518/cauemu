@@ -23,6 +23,8 @@ pub fn init() !Self {
     var bus = try Bus.init(&alloc);
     const cpu = try Cpu.init(&alloc, bus);
     const ppu = try Ppu.init(&alloc, bus);
+    bus.registerPpu(ppu);
+    ppu.reset();
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) utils.sdlPanic();
 

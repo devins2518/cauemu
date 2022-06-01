@@ -1,6 +1,7 @@
 const std = @import("std");
 const utils = @import("utils.zig");
 const alignedCreate = utils.alignedCreate;
+const Ppu = @import("Ppu.zig");
 const Self = @This();
 
 const BIOS_FILE = @embedFile("../gba.bin");
@@ -39,6 +40,8 @@ pal: *align(wordAlign) [PAL_SIZE]u8,
 vram: *align(wordAlign) [VRAM_SIZE]u8,
 oam: *align(wordAlign) [OAM_SIZE]u8,
 
+ppu: *Ppu,
+
 pub fn init(alloc: *std.mem.Allocator) !*Self {
     var bios = try alignedCreate(alloc.*, [BIOS_SIZE]u8, wordAlign);
     const wram_ob = try alignedCreate(alloc.*, [WRAM_OB_SIZE]u8, wordAlign);
@@ -59,8 +62,13 @@ pub fn init(alloc: *std.mem.Allocator) !*Self {
         .pal = pal,
         .vram = vram,
         .oam = oam,
+        .ppu = undefined,
     };
     return self;
+}
+
+pub fn registerPpu(self: *Self, ppu: *Ppu) void {
+    self.ppu = ppu;
 }
 
 pub fn deinit(self: *Self, alloc: *std.mem.Allocator) void {
@@ -98,6 +106,37 @@ pub fn writeWord(self: *Self, addr: u32, n: u32) void {
 }
 
 pub fn getAddr(
+    self: *Self,
+    addr: u32,
+    comptime alignment: ?u29,
+) *align(alignment orelse byteAlign) u8 {
+    const ptr = switch (addr) {
+        0x00000000...0x00003FFF => &self.bios[addr],
+        0x02000000...0x0203FFFF => &self.wram_ob[@mod(addr, WRAM_OB_START)],
+        0x03000000...0x03007FFF => &self.wram_oc[@mod(addr, WRAM_OC_START)],
+        0x04000000...0x040003FE => &self.io[@mod(addr, IO_START)],
+        0x05000000...0x050003FF => if (self.ppu.lcds.hblank or
+            self.ppu.lcds.vblank or self.ppu.lcdc.forced_blank)
+        blk: {
+            std.debug.print("here\n pal addr {}\n", .{@ptrToInt(self.pal)});
+            break :blk &self.pal[@mod(addr, PAL_START)];
+        } else std.debug.todo("Attempted to access PAL while locked."),
+        0x06000000...0x06017FFF => if (self.ppu.lcds.hblank or
+            self.ppu.lcds.vblank or self.ppu.lcdc.forced_blank)
+            &self.vram[@mod(addr, VRAM_START)]
+        else
+            std.debug.todo("Attempted to access VRAM while locked."),
+        0x07000000...0x070003FF => if (self.ppu.lcds.hblank or
+            self.ppu.lcds.vblank or self.ppu.lcdc.forced_blank or self.ppu.lcdc.hblank_oam_access)
+            &self.oam[@mod(addr, OAM_START)]
+        else
+            std.debug.todo("Attempted to access OAM while locked."),
+        else => std.debug.todo("Attempted to access unused memory region."),
+    };
+    return @alignCast(alignment orelse byteAlign, ptr);
+}
+
+pub fn getAddrRaw(
     self: *Self,
     addr: u32,
     comptime alignment: ?u29,
