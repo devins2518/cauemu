@@ -6,13 +6,13 @@ const Emu = @import("Emu.zig");
 
 const CLOCKS_PER_SEC_MHZ = 16.78;
 const CLOCKS_PER_SEC_HZ = CLOCKS_PER_SEC_MHZ * 1000000.0;
-const SECS_PER_CLOCK = 1 / CLOCKS_PER_SEC_HZ;
+const SECS_PER_CLOCK = 1.0 / CLOCKS_PER_SEC_HZ;
 const NSECS_PER_CLOCK = @as(
     comptime_int,
     @floor(SECS_PER_CLOCK * @as(comptime_float, std.time.ns_per_s)),
 );
 
-pub fn main() anyerror!void {
+pub fn main() !void {
     var gba = try Emu.init();
     defer gba.deinit();
 
@@ -41,5 +41,5 @@ test "static analysis" {
     _ = @import("Ppu.zig");
     _ = @import("instr.zig");
     _ = @import("utils.zig");
-    std.testing.refAllDecls(@This());
+    std.testing.refAllDeclsRecursive(@This());
 }

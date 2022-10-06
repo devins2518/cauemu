@@ -1,10 +1,11 @@
 const std = @import("std");
 const utils = @import("utils.zig");
 const alignedCreate = utils.alignedCreate;
+const Allocator = std.mem.Allocator;
 const Ppu = @import("Ppu.zig");
 const Self = @This();
 
-const BIOS_FILE = @embedFile("../gba.bin");
+const BIOS_FILE = @embedFile("./gba.bin");
 
 const BIOS_START = 0x00000000;
 const BIOS_END = 0x00003FFF;
@@ -42,14 +43,14 @@ oam: *align(wordAlign) [OAM_SIZE]u8,
 
 ppu: *Ppu,
 
-pub fn init(alloc: *std.mem.Allocator) !*Self {
-    var bios = try alignedCreate(alloc.*, [BIOS_SIZE]u8, wordAlign);
-    const wram_ob = try alignedCreate(alloc.*, [WRAM_OB_SIZE]u8, wordAlign);
-    const wram_oc = try alignedCreate(alloc.*, [WRAM_OC_SIZE]u8, wordAlign);
-    const io = try alignedCreate(alloc.*, [IO_SIZE]u8, wordAlign);
-    const pal = try alignedCreate(alloc.*, [PAL_SIZE]u8, wordAlign);
-    const vram = try alignedCreate(alloc.*, [VRAM_SIZE]u8, wordAlign);
-    const oam = try alignedCreate(alloc.*, [OAM_SIZE]u8, wordAlign);
+pub fn init(alloc: Allocator) !*Self {
+    var bios = try alignedCreate(alloc, [BIOS_SIZE]u8, wordAlign);
+    const wram_ob = try alignedCreate(alloc, [WRAM_OB_SIZE]u8, wordAlign);
+    const wram_oc = try alignedCreate(alloc, [WRAM_OC_SIZE]u8, wordAlign);
+    const io = try alignedCreate(alloc, [IO_SIZE]u8, wordAlign);
+    const pal = try alignedCreate(alloc, [PAL_SIZE]u8, wordAlign);
+    const vram = try alignedCreate(alloc, [VRAM_SIZE]u8, wordAlign);
+    const oam = try alignedCreate(alloc, [OAM_SIZE]u8, wordAlign);
 
     @memcpy(bios, BIOS_FILE, BIOS_SIZE);
 
@@ -71,7 +72,7 @@ pub fn registerPpu(self: *Self, ppu: *Ppu) void {
     self.ppu = ppu;
 }
 
-pub fn deinit(self: *Self, alloc: *std.mem.Allocator) void {
+pub fn deinit(self: *Self, alloc: Allocator) void {
     alloc.destroy(self.bios);
     alloc.destroy(self.wram_ob);
     alloc.destroy(self.wram_oc);
@@ -170,7 +171,7 @@ test "memory sizes" {
 
 test "using memory" {
     var alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    var bus = try Self.init(&alloc.allocator());
+    var bus = try Self.init(alloc.allocator());
 
     bus.writeWord(0x0, 0xCAFE0000);
     std.debug.assert(bus.readWord(0x0) == 0xCAFE0000);

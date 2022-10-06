@@ -3,6 +3,7 @@ const sdl = @cImport({
     @cInclude("SDL.h");
 });
 const utils = @import("utils.zig");
+const Allocator = std.mem.Allocator;
 const Bus = @import("Bus.zig");
 const Cpu = @import("Cpu.zig");
 const Ppu = @import("Ppu.zig");
@@ -11,7 +12,7 @@ const Self = @This();
 const ClocksPerSec = 16780000;
 
 gpa: std.heap.GeneralPurposeAllocator(.{}),
-alloc: std.mem.Allocator,
+alloc: Allocator,
 
 bus: *Bus,
 cpu: *Cpu,
@@ -20,9 +21,9 @@ ppu: *Ppu,
 pub fn init() !Self {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var alloc = gpa.allocator();
-    var bus = try Bus.init(&alloc);
-    const cpu = try Cpu.init(&alloc, bus);
-    const ppu = try Ppu.init(&alloc, bus);
+    var bus = try Bus.init(alloc);
+    const cpu = try Cpu.init(alloc, bus);
+    const ppu = try Ppu.init(alloc, bus);
     bus.registerPpu(ppu);
     ppu.reset();
 
@@ -37,7 +38,7 @@ pub fn clock(self: *Self) void {
 }
 
 pub fn deinit(self: *Self) void {
-    self.bus.deinit(&self.alloc);
+    self.bus.deinit(self.alloc);
     self.alloc.destroy(self.bus);
     self.cpu.deinit();
     self.alloc.destroy(self.cpu);

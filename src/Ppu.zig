@@ -3,6 +3,7 @@ const sdl = @cImport({
     @cInclude("SDL.h");
 });
 const utils = @import("utils.zig");
+const Allocator = std.mem.Allocator;
 const Bus = @import("Bus.zig");
 const Self = @This();
 const Height = 160;
@@ -84,8 +85,8 @@ const BITMAP_OBJ_START = 0x06014000;
 const BITMAP_OBJ_END = 0x06017FFF;
 const BITMAP_OBJ_SIZE = BITMAP_OBJ_END - BITMAP_OBJ_START + 1;
 
-const Palette = packed struct {
-    const Color = packed struct {
+const Palette = extern struct {
+    const Color = packed struct(u16) {
         _: u1,
         blue: u5,
         green: u5,
@@ -342,7 +343,7 @@ obj_palette: *Palette,
 bus: *Bus,
 clocks: usize = 0,
 
-pub fn init(alloc: *std.mem.Allocator, bus: *Bus) !*Self {
+pub fn init(alloc: Allocator, bus: *Bus) !*Self {
     var window: ?*sdl.SDL_Window = undefined;
     var renderer: ?*sdl.SDL_Renderer = undefined;
     if (sdl.SDL_CreateWindowAndRenderer(Width, Height, 0, &window, &renderer) != 0)
@@ -389,8 +390,8 @@ pub fn init(alloc: *std.mem.Allocator, bus: *Bus) !*Self {
         .blend_control = @ptrCast(utils.Field(Self, .blend_control), bus.getAddrRaw(BldCntAddr, Bus.halfWordAlign)),
         .blend_alpha = @ptrCast(utils.Field(Self, .blend_alpha), bus.getAddrRaw(BldAlphaAddr, Bus.halfWordAlign)),
         .brightness = @ptrCast(utils.Field(Self, .brightness), bus.getAddrRaw(BldyAddr, Bus.wordAlign)),
-        .bg_palette = @ptrCast(*Palette, bus.getAddrRaw(BgPaletteAddr, null)),
-        .obj_palette = @ptrCast(*Palette, bus.getAddrRaw(ObjPaletteAddr, null)),
+        .bg_palette = @ptrCast(*Palette, bus.getAddrRaw(BgPaletteAddr, 2)),
+        .obj_palette = @ptrCast(*Palette, bus.getAddrRaw(ObjPaletteAddr, 2)),
         .bus = bus,
     };
     return self;
@@ -555,8 +556,6 @@ fn constructMap(
             }
         }
     }
-    _ = TextEntry;
-    _ = screen_block;
 }
 
 pub fn deinit(self: Self) void {

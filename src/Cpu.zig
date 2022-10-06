@@ -1,6 +1,7 @@
 const std = @import("std");
 const instr = @import("instr.zig");
 const utils = @import("utils.zig");
+const Allocator = std.mem.Allocator;
 const Bus = @import("Bus.zig");
 const Self = @This();
 
@@ -68,7 +69,7 @@ spsr_irq: Cpsr = undefined,
 spsr_und: Cpsr = undefined,
 bus: *Bus,
 
-pub fn init(alloc: *std.mem.Allocator, bus: *Bus) !*Self {
+pub fn init(alloc: Allocator, bus: *Bus) !*Self {
     var self = try alloc.create(Self);
     self.* = .{ .bus = bus };
     return self;
@@ -300,8 +301,8 @@ fn branch(self: *Self, payload: instr.BranchInstr) void {
 
 test "reg access" {
     var alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    var bus = try Bus.init(&alloc.allocator());
-    var cpu = try Self.init(&alloc.allocator(), bus);
+    var bus = try Bus.init(alloc.allocator());
+    var cpu = try Self.init(alloc.allocator(), bus);
     for (cpu.regs) |*p, i| {
         p.* = @intCast(u32, i);
     }
