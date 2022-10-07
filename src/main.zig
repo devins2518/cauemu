@@ -1,7 +1,5 @@
 const std = @import("std");
-const sdl = @cImport({
-    @cInclude("SDL.h");
-});
+const sdl = @import("c.zig").sdl;
 const Emu = @import("Emu.zig");
 
 const CLOCKS_PER_SEC_MHZ = 16.78;

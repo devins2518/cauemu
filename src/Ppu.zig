@@ -1,7 +1,5 @@
 const std = @import("std");
-const sdl = @cImport({
-    @cInclude("SDL.h");
-});
+const sdl = @import("c.zig").sdl;
 const utils = @import("utils.zig");
 const Allocator = std.mem.Allocator;
 const Bus = @import("Bus.zig");

@@ -1,7 +1,5 @@
 const std = @import("std");
-const sdl = @cImport({
-    @cInclude("SDL.h");
-});
+const sdl = @import("c.zig").sdl;
 
 pub fn Field(comptime ty: type, comptime mem: anytype) type {
     comptime {
