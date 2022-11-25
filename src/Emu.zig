@@ -10,7 +10,6 @@ const Self = @This();
 const ClocksPerSec = 16780000;
 
 gpa: std.heap.GeneralPurposeAllocator(.{}),
-alloc: Allocator,
 
 bus: *Bus,
 cpu: *Cpu,
@@ -27,7 +26,7 @@ pub fn init() !Self {
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) utils.sdlPanic();
 
-    return Self{ .gpa = gpa, .alloc = alloc, .bus = bus, .cpu = cpu, .ppu = ppu };
+    return Self{ .gpa = gpa, .bus = bus, .cpu = cpu, .ppu = ppu };
 }
 
 pub fn clock(self: *Self) void {
@@ -36,12 +35,13 @@ pub fn clock(self: *Self) void {
 }
 
 pub fn deinit(self: *Self) void {
-    self.bus.deinit(self.alloc);
-    self.alloc.destroy(self.bus);
+    const alloc = self.gpa.allocator();
+    self.bus.deinit(alloc);
+    alloc.destroy(self.bus);
     self.cpu.deinit();
-    self.alloc.destroy(self.cpu);
+    alloc.destroy(self.cpu);
     self.ppu.deinit();
-    self.alloc.destroy(self.ppu);
+    alloc.destroy(self.ppu);
 }
 
 test "static analysis" {
