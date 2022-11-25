@@ -42,6 +42,7 @@ pub fn deinit(self: *Self) void {
     alloc.destroy(self.cpu);
     self.ppu.deinit();
     alloc.destroy(self.ppu);
+    std.debug.assert(!self.gpa.deinit());
 }
 
 test "static analysis" {
