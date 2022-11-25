@@ -4,6 +4,7 @@ const utils = @import("utils.zig");
 const Allocator = std.mem.Allocator;
 const Bus = @import("Bus.zig");
 const Self = @This();
+const Instruction = instr.Instruction;
 
 const SP = 13;
 const LR = 13;
@@ -119,7 +120,7 @@ fn readWord(self: *Self) u32 {
 }
 
 pub fn clock(self: *Self) void {
-    const opcode = instr.parseOpcode(self.readWord());
+    const opcode = Instruction.parse(self.readWord());
     switch (opcode.instr) {
         // Logical ALU
         .mov => |mov| self.alu(mov),
