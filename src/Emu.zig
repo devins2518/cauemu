@@ -14,6 +14,7 @@ gpa: std.heap.GeneralPurposeAllocator(.{}),
 bus: *Bus,
 cpu: *Cpu,
 ppu: *Ppu,
+step: bool = true,
 
 pub fn init() !Self {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -29,8 +30,8 @@ pub fn init() !Self {
     return Self{ .gpa = gpa, .bus = bus, .cpu = cpu, .ppu = ppu };
 }
 
-pub fn clock(self: *Self) void {
-    self.cpu.clock();
+pub fn clock(self: *Self) !void {
+    try self.cpu.clock();
     self.ppu.clock();
 }
 

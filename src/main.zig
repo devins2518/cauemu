@@ -20,11 +20,20 @@ pub fn main() !void {
     main: while (true) {
         while ((sdl.SDL_PollEvent(&e) == 1)) {
             switch (e.type) {
+                sdl.SDL_KEYDOWN => {
+                    switch (e.key.keysym.scancode) {
+                        sdl.SDL_SCANCODE_J => if (gba.step)
+                            try gba.clock(),
+                        sdl.SDL_SCANCODE_G => gba.step = !gba.step,
+                        else => {},
+                    }
+                },
                 sdl.SDL_QUIT => break :main,
                 else => {},
             }
         }
-        gba.clock();
+        if (!gba.step)
+            try gba.clock();
         var sleep = timer.previous.since(timer.started);
         std.time.sleep(NSECS_PER_CLOCK -| sleep);
     }

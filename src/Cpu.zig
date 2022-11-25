@@ -119,8 +119,9 @@ fn readWord(self: *Self) u32 {
     return self.bus.readWord(self.getReg(15));
 }
 
-pub fn clock(self: *Self) void {
+pub fn clock(self: *Self) !void {
     const opcode = Instruction.parse(self.readWord());
+    try std.fmt.format(std.io.getStdOut().writer(), "{}", .{opcode});
     switch (opcode.instr) {
         // Logical ALU
         .mov => |mov| self.alu(mov),
