@@ -121,18 +121,18 @@ pub fn getAddr(
         blk: {
             std.debug.print("here\n pal addr {}\n", .{@ptrToInt(self.pal)});
             break :blk &self.pal[@mod(addr, PAL_START)];
-        } else std.debug.todo("Attempted to access PAL while locked."),
+        } else @panic("Attempted to access PAL while locked."),
         0x06000000...0x06017FFF => if (self.ppu.lcds.hblank or
             self.ppu.lcds.vblank or self.ppu.lcdc.forced_blank)
             &self.vram[@mod(addr, VRAM_START)]
         else
-            std.debug.todo("Attempted to access VRAM while locked."),
+            @panic("Attempted to access VRAM while locked."),
         0x07000000...0x070003FF => if (self.ppu.lcds.hblank or
             self.ppu.lcds.vblank or self.ppu.lcdc.forced_blank or self.ppu.lcdc.hblank_oam_access)
             &self.oam[@mod(addr, OAM_START)]
         else
-            std.debug.todo("Attempted to access OAM while locked."),
-        else => std.debug.todo("Attempted to access unused memory region."),
+            @panic("Attempted to access OAM while locked."),
+        else => @panic("Attempted to access unused memory region."),
     };
     return @alignCast(alignment orelse byteAlign, ptr);
 }
@@ -150,7 +150,7 @@ pub fn getAddrRaw(
         0x05000000...0x050003FF => &self.pal[@mod(addr, PAL_START)],
         0x06000000...0x06017FFF => &self.vram[@mod(addr, VRAM_START)],
         0x07000000...0x070003FF => &self.oam[@mod(addr, OAM_START)],
-        else => std.debug.todo("Attempted to access unused memory region."),
+        else => @panic("Attempted to access unused memory region."),
     };
     return @alignCast(alignment orelse byteAlign, ptr);
 }

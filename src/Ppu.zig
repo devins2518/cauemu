@@ -501,7 +501,7 @@ fn renderBackground(self: *Self, comptime layer: comptime_int) void {
 
             _ = xoffset;
             _ = yoffset;
-            std.debug.todo("renderBackground");
+            @panic("TODO: renderBackground");
         },
         else => @panic("unimplemented"),
     }

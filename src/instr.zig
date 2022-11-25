@@ -9,7 +9,7 @@ const Instruction = struct {
         mvn: AluInstr,
         orr: AluInstr,
         eor: AluInstr,
-        and_: AluInstr,
+        @"and": AluInstr,
         bic: AluInstr,
         tst: AluInstr,
         teq: AluInstr,
@@ -50,6 +50,11 @@ const Instruction = struct {
         nop,
     },
     cond: Cond,
+
+    pub fn format(self: Instruction, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        @compileLog(@bitSizeOf(AluInstr));
+        try writer.writeAll(@tagName(self.instr));
+    }
 };
 
 pub const Register = u4;
@@ -141,7 +146,7 @@ pub fn parseOpcode(op: u32) Instruction {
             0x000...0x008, 0x00A, 0x00C, 0x00E,
             0x010...0x018, 0x01A, 0x01C, 0x01E,
             0x200...0x21F,
-            => .{ .and_ = AluInstr.parseAlu(op, .and_) },
+            => .{ .@"and" = AluInstr.parseAlu(op, .@"and") },
             0x1C0...0x1C8, 0x1CA, 0x1CC, 0x1CE,
             0x1D0...0x1D8, 0x1DA, 0x1DC, 0x1DE,
             0x3C0...0x3DF,
@@ -272,7 +277,7 @@ pub fn parseOpcode(op: u32) Instruction {
             0xB00...0xBFF,
             => .{.bl = BranchInstr.parseBranch(op, .bl)},
             0x121,
-            => .{.bx = BranchExInstr.parseBranchEx(op, .bx)},
+            => .{.bx = BranchExInstr.parseBranchEx(op)},
             0x100, 0x140,
             => .{.mrs = PSRTransferInstr.parsePSRTransfer(op, .mrs)},
             0x120, 0x160,
@@ -290,7 +295,7 @@ pub fn parseOpcode(op: u32) Instruction {
 }
 
 pub const AluOpcode = enum(u8) {
-    and_ = 0x0,
+    @"and" = 0x0,
     eor = 0x1,
     sub = 0x2,
     rsb = 0x3,
@@ -312,7 +317,7 @@ pub const AluOpcode = enum(u8) {
             self == .mvn or
             self == .orr or
             self == .eor or
-            self == .and_ or
+            self == .@"and" or
             self == .bic or
             self == .tst or
             self == .teq;
@@ -506,26 +511,25 @@ pub const SDSwapInstr = struct {
 };
 
 pub const BranchOpcode = enum(u1) { b = 0b0, bl = 0b1 };
-pub const BranchInstr = struct {
+pub const BranchInstr = packed struct(u28) {
+    _: u3 = 0b101,
     op: BranchOpcode,
     offset: i24,
 
     fn parseBranch(op: u32, assert: BranchOpcode) BranchInstr {
-        std.debug.assert((op & 0x0E000000) >> 25 == 0b0101);
-        std.debug.assert((op & 0x01000000) >> 24 == @enumToInt(assert));
-        return .{ .op = assert, .offset = @bitCast(i24, @truncate(u24, op & 0x00FFFFFF)) };
+        std.debug.assert(@truncate(u3, op >> 25) == 0b101);
+        std.debug.assert(@truncate(u1, op >> 24) == @enumToInt(assert));
+        return @bitCast(BranchInstr, @truncate(u28, op));
     }
 };
 
-const BranchExOpcode = enum(u4) { bx = 0b0001 };
-const BranchExInstr = struct {
-    op: BranchExOpcode,
+const BranchExInstr = packed struct(u28) {
+    _: u24,
     reg: Register,
 
-    fn parseBranchEx(op: u32, assert: BranchExOpcode) BranchExInstr {
-        std.debug.assert((op & 0x0FFFFF00) >> 8 == 0x12FFF);
-        std.debug.assert((op & 0x000000F0) >> 4 == @enumToInt(assert));
-        return .{ .op = assert, .reg = @truncate(u4, op & 0x0000000F) };
+    fn parseBranchEx(op: u32) BranchExInstr {
+        std.debug.assert(op & 0x0FFFFFF0 == 0x012FFF10);
+        return @bitCast(BranchExInstr, @truncate(u28, op));
     }
 };
 
