@@ -76,8 +76,8 @@ pub fn init(alloc: Allocator, bus: *Bus) !*Self {
     return self;
 }
 
-pub fn deinit(self: Self) void {
-    _ = self;
+pub fn deinit(self: *Self, allocator: Allocator) void {
+    allocator.destroy(self);
 }
 
 fn getRegPtr(self: *Self, reg: instr.Register) *u32 {
@@ -302,9 +302,13 @@ fn branch(self: *Self, payload: instr.BranchInstr) void {
 }
 
 test "reg access" {
-    var alloc = std.heap.GeneralPurposeAllocator(.{}){};
-    var bus = try Bus.init(alloc.allocator());
-    var cpu = try Self.init(alloc.allocator(), bus);
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer std.debug.assert(!gpa.deinit());
+    var bus = try Bus.init(allocator);
+    defer bus.deinit(allocator);
+    var cpu = try Self.init(allocator, bus);
+    defer cpu.deinit(allocator);
     for (cpu.regs) |*p, i| {
         p.* = @intCast(u32, i);
     }

@@ -80,6 +80,7 @@ pub fn deinit(self: *Self, alloc: Allocator) void {
     alloc.destroy(self.pal);
     alloc.destroy(self.vram);
     alloc.destroy(self.oam);
+    alloc.destroy(self);
 }
 
 pub fn readByte(self: *Self, addr: u32) u8 {

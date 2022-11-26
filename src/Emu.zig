@@ -36,13 +36,11 @@ pub fn clock(self: *Self) !void {
 }
 
 pub fn deinit(self: *Self) void {
-    const alloc = self.gpa.allocator();
-    self.bus.deinit(alloc);
-    alloc.destroy(self.bus);
-    self.cpu.deinit();
-    alloc.destroy(self.cpu);
+    const allocator = self.gpa.allocator();
+    self.bus.deinit(allocator);
+    self.cpu.deinit(allocator);
     self.ppu.deinit();
-    alloc.destroy(self.ppu);
+    allocator.destroy(self.ppu);
     std.debug.assert(!self.gpa.deinit());
 }
 
