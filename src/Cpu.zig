@@ -7,8 +7,8 @@ const Self = @This();
 const Instruction = instr.Instruction;
 
 const SP = 13;
-const LR = 13;
-const PC = 13;
+const LR = 14;
+const PC = 15;
 const Reg0 = 0;
 const Reg1 = 1;
 const Reg2 = 2;
@@ -42,14 +42,6 @@ const Reg13Und = 29;
 const Reg14Und = 30;
 
 const Cpsr = struct {
-    signed: bool = false,
-    zero: bool = false,
-    carry: bool = false,
-    overflow: bool = false,
-    _: u20 = undefined,
-    irq_disable: bool = false,
-    fiq_disable: bool = false,
-    state: enum(u1) { arm, thumb } = .arm,
     mode: enum(u5) {
         user = 0b10000,
         fiq = 0b10001,
@@ -59,6 +51,14 @@ const Cpsr = struct {
         und = 0b11011,
         system = 0b11111,
     } = .user,
+    state: enum(u1) { arm, thumb } = .arm,
+    fiq_disable: bool = false,
+    irq_disable: bool = false,
+    _: u20 = undefined,
+    overflow: bool = false,
+    carry: bool = false,
+    zero: bool = false,
+    signed: bool = false,
 };
 
 regs: [31]u32 = [_]u32{0} ** 31,
@@ -115,12 +115,23 @@ fn setReg(self: *Self, reg: instr.Register, n: u32) void {
     self.getRegPtr(reg).* = n;
 }
 
+fn getSpsr(self: *Self) Cpsr {
+    return switch (self.cpsr.mode) {
+        .user => self.cpsr,
+        .fiq => self.spsr_fiq,
+        .system => self.spsr_svc,
+        .abt => self.spsr_abt,
+        .irq => self.spsr_irq,
+        .undef => self.spsr_und,
+    };
+}
+
 fn readWord(self: *Self) u32 {
-    return self.bus.readWord(self.getReg(15));
+    return self.bus.readWord(self.getReg(PC));
 }
 
 pub fn clock(self: *Self) !void {
-    const opcode = Instruction.parse(self.readWord());
+    const opcode = Instruction.parse(self.readWord(), self.getReg(PC));
     try std.fmt.format(std.io.getStdOut().writer(), "{}", .{opcode});
     switch (opcode.instr) {
         // Logical ALU
@@ -246,13 +257,10 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
                     },
                 }
             },
-            .imm => |s| {
-                const val = std.math.rotr(u32, s.imm, @intCast(u8, s.rot * 2));
-                break :blk .{
-                    .val = val,
-                    // TODO: accurate?
-                    .carry = val >> (s.rot * 2) & 0x1 == 0x1,
-                };
+            .imm => |s| break :blk .{
+                .val = s,
+                // TODO: accurate?
+                .carry = @truncate(u1, s) == 0x1,
             },
         }
     };
@@ -298,7 +306,7 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
 
 fn branch(self: *Self, payload: instr.BranchInstr) void {
     if (payload.op == .bl) self.setReg(LR, self.getReg(PC));
-    self.setReg(PC, self.getReg(PC) +% @bitCast(u24, payload.offset));
+    self.setReg(PC, self.getReg(PC) +% payload.offset);
 }
 
 test "reg access" {

@@ -1,0 +1,12 @@
+pkgs:
+  cauemu:
+    version: 0.0.0
+    description: The cringe and unbased GBA emulator.
+    license: MIT
+    source_url: "https://github.com/devins2518/cauemu"
+    root: src/main.zig
+    files:
+      README.md
+      LICENSE
+deps:
+  devins2518/matches: ^0.1.0

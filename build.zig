@@ -1,4 +1,5 @@
 const std = @import("std");
+const pkg = @import("deps.zig").pkgs;
 
 pub fn build(b: *std.build.Builder) void {
     // Standard target options allows the person running `zig build` to choose
@@ -12,6 +13,7 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
 
     const exe = b.addExecutable("cauemu", "src/main.zig");
+    pkg.addAllTo(exe);
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.linkSystemLibrary("sdl2");
@@ -28,6 +30,7 @@ pub fn build(b: *std.build.Builder) void {
     run_step.dependOn(&run_cmd.step);
 
     const exe_tests = b.addTest("src/main.zig");
+    pkg.addAllTo(exe_tests);
     exe_tests.setTarget(target);
     exe_tests.setBuildMode(mode);
     exe_tests.linkSystemLibrary("sdl2");
