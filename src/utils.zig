@@ -25,7 +25,7 @@ pub fn alignedCreate(
     comptime alignment: ?u29,
 ) std.mem.Allocator.Error!*align(alignment orelse @alignOf(T)) T {
     if (@sizeOf(T) == 0) return @as(*T, undefined);
-    const slice = try self.allocAdvancedWithRetAddr(T, alignment, 1, .exact, @returnAddress());
+    const slice = try self.allocAdvancedWithRetAddr(T, alignment, 1, @returnAddress());
     return &slice[0];
 }
 

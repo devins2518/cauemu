@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 const Bus = @import("Bus.zig");
 const Self = @This();
 const Instruction = instr.Instruction;
+const Register = instr.Register;
 
 const SP = 13;
 const LR = 14;
@@ -82,32 +83,32 @@ pub fn deinit(self: *Self, allocator: Allocator) void {
 
 fn getRegPtr(self: *Self, reg: instr.Register) *u32 {
     const idx = switch (self.cpsr.mode) {
-        .fiq => if (reg > 7 and reg < 15)
-            reg + @intCast(usize, Reg8Fiq - Reg8)
+        .fiq => if (reg.r > 7 and reg.r < 15)
+            reg.r + @intCast(usize, Reg8Fiq - Reg8)
         else
-            reg,
-        .svc => if (reg == 13 or reg == 14)
-            reg + @intCast(usize, Reg13Svc - Reg13)
+            reg.r,
+        .svc => if (reg.r == 13 or reg.r == 14)
+            reg.r + @intCast(usize, Reg13Svc - Reg13)
         else
-            reg,
-        .abt => if (reg == 13 or reg == 14)
-            reg + @intCast(usize, Reg13Abt - Reg13)
+            reg.r,
+        .abt => if (reg.r == 13 or reg.r == 14)
+            reg.r + @intCast(usize, Reg13Abt - Reg13)
         else
-            reg,
-        .irq => if (reg == 13 or reg == 14)
-            reg + @intCast(usize, Reg13Irq - Reg13)
+            reg.r,
+        .irq => if (reg.r == 13 or reg.r == 14)
+            reg.r + @intCast(usize, Reg13Irq - Reg13)
         else
-            reg,
-        .und => if (reg == 13 or reg == 14)
-            reg + @intCast(usize, Reg13Und - Reg13)
+            reg.r,
+        .und => if (reg.r == 13 or reg.r == 14)
+            reg.r + @intCast(usize, Reg13Und - Reg13)
         else
-            reg,
-        else => reg,
+            reg.r,
+        else => reg.r,
     };
     return &self.regs[idx];
 }
 
-fn getReg(self: *Self, reg: instr.Register) u32 {
+fn getReg(self: *Self, reg: Register) u32 {
     return self.getRegPtr(reg).*;
 }
 
@@ -127,36 +128,17 @@ fn getSpsr(self: *Self) Cpsr {
 }
 
 fn readWord(self: *Self) u32 {
-    return self.bus.readWord(self.getReg(PC));
+    return self.bus.readWord(self.getReg(Register.from(PC)));
 }
 
 pub fn clock(self: *Self) !void {
-    const opcode = Instruction.parse(self.readWord(), self.getReg(PC));
+    const opcode = Instruction.parse(self.readWord(), self.getReg(Register.from(PC)));
     try std.fmt.format(std.io.getStdOut().writer(), "{}", .{opcode});
-    switch (opcode.instr) {
-        // Logical ALU
-        .mov => |mov| self.alu(mov),
-        .mvn => |mvn| self.alu(mvn),
-        .orr => |orr| self.alu(orr),
-        .eor => |eor| self.alu(eor),
-        .@"and" => |@"and"| self.alu(@"and"),
-        .bic => |bic| self.alu(bic),
-        .tst => |tst| self.alu(tst),
-        .teq => |teq| self.alu(teq),
-        // Arithmetic ALU
-        .add => |add| self.alu(add),
-        .adc => |adc| self.alu(adc),
-        .sub => |sub| self.alu(sub),
-        .sbc => |sbc| self.alu(sbc),
-        .rsb => |rsb| self.alu(rsb),
-        .rsc => |rsc| self.alu(rsc),
-        .cmp => |cmp| self.alu(cmp),
-        .cmn => |cmn| self.alu(cmn),
-        // Jump
-        .b => |b| self.branch(b),
-        .bl => |bl| self.branch(bl),
+    switch (opcode) {
+        .alu => |alu_payload| self.alu(alu_payload),
+        .branch => |branch_payload| self.branch(branch_payload),
         else => {
-            std.log.err("unimplemented opcode {}", .{opcode.instr});
+            std.log.err("unimplemented opcode {}", .{opcode});
             std.process.exit(1);
         },
     }
@@ -164,16 +146,18 @@ pub fn clock(self: *Self) !void {
 
 // Logical/Arithmetic Alu
 fn alu(self: *Self, payload: instr.AluInstr) void {
-    if (payload.rn == PC) utils.prefetchWarn();
-    if (payload.rd == PC) utils.prefetchWarn();
+    if (payload.rn.r == PC) utils.prefetchWarn();
+    if (payload.rd.r == PC) utils.prefetchWarn();
+    const rn = self.getReg(payload.rn);
     const op2: struct { val: u32, carry: bool } = blk: {
         switch (payload.op2) {
             .reg => |s| {
                 const rm = self.getReg(s.reg);
-                if (rm == PC) utils.prefetchWarn();
+                if (s.reg.r == PC) utils.prefetchWarn();
                 switch (s.shift_by) {
                     // LSL#0
-                    .imm => |imm| {
+                    .imm => |_imm| {
+                        const imm = @truncate(u5, _imm);
                         switch (s.shift_type) {
                             .lsl => if (imm == 0) {
                                 break :blk .{ .val = rm, .carry = self.cpsr.carry };
@@ -198,7 +182,7 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
                         }
                     },
                     .reg => |rs| {
-                        if (rs == PC) utils.prefetchWarn();
+                        if (rs.r == PC) utils.prefetchWarn();
                         const shift = @truncate(u8, self.getReg(rs));
                         const shift_u5 = @truncate(u5, shift);
                         switch (s.shift_type) {
@@ -267,24 +251,24 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
     const res = switch (payload.op) {
         .mov => op2.val,
         .mvn => ~op2.val,
-        .orr => payload.rn | op2.val,
-        .eor, .teq => payload.rn ^ op2.val,
-        .@"and", .tst => payload.rn & op2.val,
-        .bic => payload.rn & ~op2.val,
-        .add => payload.rn + op2.val,
-        .adc => payload.rn + op2.val + @boolToInt(self.cpsr.carry),
-        .sub => payload.rn - op2.val,
-        .sbc => payload.rn - op2.val + @boolToInt(self.cpsr.carry) - 1,
-        .rsb => op2.val - payload.rn,
-        .rsc => op2.val - payload.rn + @boolToInt(self.cpsr.carry) - 1,
-        .cmp => payload.rn - op2.val,
-        .cmn => payload.rn + op2.val,
+        .orr => rn | op2.val,
+        .eor, .teq => rn ^ op2.val,
+        .@"and", .tst => rn & op2.val,
+        .bic => rn & ~op2.val,
+        .add => rn + op2.val,
+        .adc => rn + op2.val + @boolToInt(self.cpsr.carry),
+        .sub => rn - op2.val,
+        .sbc => rn - op2.val + @boolToInt(self.cpsr.carry) - 1,
+        .rsb => op2.val - rn,
+        .rsc => op2.val - rn + @boolToInt(self.cpsr.carry) - 1,
+        .cmp => rn - op2.val,
+        .cmn => rn + op2.val,
     };
 
     if (payload.op != .tst or payload.op != .teq or payload.op != .cmp or payload.op != .cmn)
         self.setReg(payload.rd, res);
 
-    if (payload.s and payload.rd != 15) {
+    if (payload.s and payload.rd.r != 15) {
         if (res == 0) self.cpsr.zero = true;
         blk: {
             if (payload.op.isLogical()) {
@@ -305,8 +289,8 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
 }
 
 fn branch(self: *Self, payload: instr.BranchInstr) void {
-    if (payload.op == .bl) self.setReg(LR, self.getReg(PC));
-    self.setReg(PC, self.getReg(PC) +% payload.offset);
+    if (payload.op == .bl) self.setReg(Register.from(LR), self.getReg(Register.from(PC)));
+    self.setReg(Register.from(PC), payload.offset);
 }
 
 test "reg access" {
@@ -318,21 +302,21 @@ test "reg access" {
     var cpu = try Self.init(allocator, bus);
     defer cpu.deinit(allocator);
     for (cpu.regs) |*p, i| {
-        p.* = @intCast(u32, i);
+        p.* = @truncate(u4, i);
     }
-    try std.testing.expect(cpu.getReg(13) == Reg13);
+    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13);
     cpu.cpsr.mode = .fiq;
-    try std.testing.expect(cpu.getReg(13) == Reg13Fiq);
+    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Fiq);
     cpu.cpsr.mode = .irq;
-    try std.testing.expect(cpu.getReg(13) == Reg13Irq);
+    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Irq);
     cpu.cpsr.mode = .svc;
-    try std.testing.expect(cpu.getReg(13) == Reg13Svc);
+    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Svc);
     cpu.cpsr.mode = .abt;
-    try std.testing.expect(cpu.getReg(13) == Reg13Abt);
+    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Abt);
     cpu.cpsr.mode = .und;
-    try std.testing.expect(cpu.getReg(13) == Reg13Und);
+    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Und);
     cpu.cpsr.mode = .system;
-    try std.testing.expect(cpu.getReg(13) == Reg13);
+    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13);
 }
 
 test "static analysis" {
