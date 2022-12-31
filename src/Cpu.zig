@@ -302,21 +302,21 @@ test "reg access" {
     var cpu = try Self.init(allocator, bus);
     defer cpu.deinit(allocator);
     for (cpu.regs) |*p, i| {
-        p.* = @truncate(u4, i);
+        p.* = @truncate(u32, i);
     }
-    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13);
+    try std.testing.expectEqual(cpu.getReg(Register.from(13)), Reg13);
     cpu.cpsr.mode = .fiq;
-    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Fiq);
+    try std.testing.expectEqual(cpu.getReg(Register.from(13)), Reg13Fiq);
     cpu.cpsr.mode = .irq;
-    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Irq);
+    try std.testing.expectEqual(cpu.getReg(Register.from(13)), Reg13Irq);
     cpu.cpsr.mode = .svc;
-    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Svc);
+    try std.testing.expectEqual(cpu.getReg(Register.from(13)), Reg13Svc);
     cpu.cpsr.mode = .abt;
-    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Abt);
+    try std.testing.expectEqual(cpu.getReg(Register.from(13)), Reg13Abt);
     cpu.cpsr.mode = .und;
-    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13Und);
+    try std.testing.expectEqual(cpu.getReg(Register.from(13)), Reg13Und);
     cpu.cpsr.mode = .system;
-    try std.testing.expect(cpu.getReg(Register.from(13)) == Reg13);
+    try std.testing.expectEqual(cpu.getReg(Register.from(13)), Reg13);
 }
 
 test "static analysis" {

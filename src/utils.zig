@@ -3,7 +3,7 @@ const sdl = @import("c.zig").sdl;
 
 pub fn Field(comptime ty: type, comptime mem: anytype) type {
     comptime {
-        return std.meta.fieldInfo(ty, mem).field_type;
+        return std.meta.fieldInfo(ty, mem).type;
     }
 }
 
