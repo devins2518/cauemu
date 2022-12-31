@@ -3066,7 +3066,7 @@ test "instruction decoding" {
         \\undef
         \\undef
         \\mvnshi r8, pc, ror r1
-        // msreq r0, (undef: 17)
+        // TODO: msreq r0, (undef: 17)
         \\tsteq r1, r0, lsl 0x2
         \\undef
         \\rscs pc, r0, ip, lsl 0x10
@@ -3088,7 +3088,7 @@ test "instruction decoding" {
         \\streq r0, [r1, -r3, lsl 31]
         \\tsthi r0, r7
         \\ldrshhi r0, [lr], 12
-        // mrseq r0, (UNDEF: 17)
+        // TODO: mrseq r0, (UNDEF: 17)
         \\tsteq r1, r0, lsl 0x2
         \\undef
         \\ldrbhi pc, [lr, 3585]!
@@ -3498,7 +3498,7 @@ test "instruction decoding" {
         \\undef
         \\undef
         \\undef
-        // mrseq r0, SP_svc
+        // TODO: mrseq r0, SP_svc
         \\tsteq r3, r0, lsl 0x6
         \\andeq r8, r0, 0x10000
         \\ldrshhi pc, [r8], 140
@@ -3758,7 +3758,7 @@ test "instruction decoding" {
         \\undef
         \\undef
         \\undef
-        // mrseq r0, (UNDEF: 0)
+        // TODO: mrseq r0, (UNDEF: 0)
         \\tsteq r0, r0
         \\ldmdbvc r9!, {r0, r6, r7, r8, ip, sp, lr, pc}^
         \\andeq r0, r0, r0
