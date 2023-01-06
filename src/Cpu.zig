@@ -62,6 +62,7 @@ const Cpsr = struct {
     signed: bool = false,
 };
 
+prefetch_buffer: [2]?Instruction = .{ null, null },
 regs: [31]u32 = [_]u32{0} ** 31,
 cpsr: Cpsr = .{},
 spsr_fiq: Cpsr = undefined,
@@ -132,16 +133,28 @@ fn readWord(self: *Self) u32 {
 }
 
 pub fn clock(self: *Self) !void {
-    const opcode = Instruction.parse(self.readWord(), self.getReg(Register.from(PC)));
-    try std.fmt.format(std.io.getStdOut().writer(), "{}", .{opcode});
-    switch (opcode) {
-        .alu => |alu_payload| self.alu(alu_payload),
-        .branch => |branch_payload| self.branch(branch_payload),
-        else => {
-            std.log.err("unimplemented opcode {}", .{opcode});
-            std.process.exit(1);
+    const instruction = self.fetch() orelse return;
+    std.log.scoped(.Cpu).info("0x{x:0>8}: {}", .{ self.getReg(Register.from(PC)) - 12, instruction });
+    switch (instruction) {
+        .branchx => |branchx_payload| self.branchEx(branchx_payload),
+        .svc => |svc_payload| self.svc(svc_payload),
+        .undef => self.undef(),
+        inline else => |payload| switch (payload.op) {
+            inline else => |op| @field(self, @tagName(op))(payload),
         },
     }
+}
+
+fn flushPrefetch(self: *Self) void {
+    self.prefetch_buffer = .{ null, null };
+}
+
+fn fetch(self: *Self) ?Instruction {
+    const opcode = self.prefetch_buffer[0];
+    self.prefetch_buffer[0] = self.prefetch_buffer[1];
+    self.prefetch_buffer[1] = Instruction.parse(self.readWord(), self.getReg(Register.from(PC)));
+    self.getRegPtr(Register.from(PC)).* += 4;
+    return opcode;
 }
 
 // Logical/Arithmetic Alu
