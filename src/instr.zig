@@ -14,7 +14,7 @@ pub const Instruction = union(enum) {
     branch: BranchInstr,
     branchx: BranchExInstr,
     psr_transfer: PSRTransferInstr,
-    svc: SWIInstr,
+    svc: SVCInstr,
     undef,
 
     pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
@@ -67,7 +67,7 @@ pub const Instruction = union(enum) {
         else if (matches(op, "0bxxxx100xxxx1xxxxxxxxxxxxxxxxxxxx"))
             Instruction{ .bd_transfer = BDTransferInstr.parseBDTransfer(op, .ldm) }
         else if (matches(bits20, "0b1111xxxx"))
-            Instruction{ .svc = SWIInstr.parse(op) }
+            Instruction{ .svc = SVCInstr.parse(op) }
         else
             Instruction{ .undef = undefined };
     }
@@ -93,7 +93,7 @@ pub const Register = struct {
     }
 };
 
-const Cond = enum(u4) {
+pub const Cond = enum(u4) {
     eq = 0x0,
     ne = 0x1,
     cs = 0x2,
@@ -117,7 +117,7 @@ const Cond = enum(u4) {
     }
 };
 
-const Op2 = union(enum) {
+pub const Op2 = union(enum) {
     reg: struct {
         shift_by: union(enum) {
             imm: u6,
@@ -643,16 +643,16 @@ pub const BranchInstr = struct {
         return BranchInstr{
             .cond = @intToEnum(Cond, @truncate(u4, op >> 28)),
             .op = assert,
-            .offset = (offset << 2) +% address,
+            .offset = (offset << 2) +% address + 8,
         };
     }
 
     pub fn format(self: BranchInstr, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        try std.fmt.format(writer, "{s}{} 0x{x}", .{ @tagName(self.op), self.cond, self.offset + 8 });
+        try std.fmt.format(writer, "{s}{} 0x{x}", .{ @tagName(self.op), self.cond, self.offset });
     }
 };
 
-const BranchExInstr = struct {
+pub const BranchExInstr = struct {
     cond: Cond,
     reg: Register,
 
@@ -669,8 +669,8 @@ const BranchExInstr = struct {
     }
 };
 
-const PSRTransferOpcode = enum(u2) { mrs = 0b0, msr = 0b1 };
-const PSRTransferInstr = struct {
+pub const PSRTransferOpcode = enum(u2) { mrs = 0b0, msr = 0b1 };
+pub const PSRTransferInstr = struct {
     cond: Cond,
     op: union(PSRTransferOpcode) {
         mrs: struct { rd: Register },
@@ -762,16 +762,16 @@ const PSRTransferInstr = struct {
     }
 };
 
-const SWIInstr = struct {
+pub const SVCInstr = struct {
     cond: Cond,
     comment: u24,
 
-    pub fn format(self: SWIInstr, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(self: SVCInstr, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try std.fmt.format(writer, "svc{} 0x{x:0>8}", .{ self.cond, self.comment });
     }
 
-    fn parse(op: u32) SWIInstr {
-        return SWIInstr{
+    fn parse(op: u32) SVCInstr {
+        return SVCInstr{
             .cond = @intToEnum(Cond, @truncate(u4, op >> 28)),
             .comment = @truncate(u24, op),
         };

@@ -7,6 +7,8 @@ const Self = @This();
 const Instruction = instr.Instruction;
 const Register = instr.Register;
 
+const CpuLog = std.log.scoped(.Cpu);
+
 const SP = 13;
 const LR = 14;
 const PC = 15;
@@ -62,7 +64,7 @@ const Cpsr = struct {
     signed: bool = false,
 };
 
-prefetch_buffer: [2]?Instruction = .{ null, null },
+prefetch_buffer: [2]?u32 = .{ null, null },
 regs: [31]u32 = [_]u32{0} ** 31,
 cpsr: Cpsr = .{},
 spsr_fiq: Cpsr = undefined,
@@ -113,8 +115,31 @@ fn getReg(self: *Self, reg: Register) u32 {
     return self.getRegPtr(reg).*;
 }
 
+fn setFlag(self: *Self, comptime flag: enum { overflow, zero, carry, signed }, update: bool) void {
+    @field(self.cpsr, @tagName(flag)) = update;
+}
+
 fn setReg(self: *Self, reg: instr.Register, n: u32) void {
     self.getRegPtr(reg).* = n;
+}
+
+fn setPC(self: *Self, n: u32) void {
+    self.branchWritePC(n);
+}
+
+fn branchWritePC(self: *Self, n: u32) void {
+    if (self.cpsr.state == .arm) {
+        if (@truncate(u2, n) != 0b00)
+            CpuLog.warn("Unpredicatable: 0x{x:0>8} does not end in 0b00", .{n});
+        self.branchTo(n & 0xFFFFFFFC);
+    } else {
+        self.branchTo(n & 0xFFFFFFFE);
+    }
+    self.flushPrefetch();
+}
+
+fn branchTo(self: *Self, n: u32) void {
+    self.getRegPtr(Register.from(PC)).* = n;
 }
 
 fn getSpsr(self: *Self) Cpsr {
@@ -134,10 +159,18 @@ fn readWord(self: *Self) u32 {
 
 pub fn clock(self: *Self) !void {
     const instruction = self.fetch() orelse return;
-    std.log.scoped(.Cpu).info("0x{x:0>8}: {}", .{ self.getReg(Register.from(PC)) - 12, instruction });
+    CpuLog.info("0x{x:0>8}: {}", .{ self.getReg(Register.from(PC)) - 12, instruction });
     switch (instruction) {
+        .branch => |branch_payload| switch (branch_payload.op) {
+            .b => self.branch(branch_payload),
+            .bl => self.branchLink(branch_payload),
+        },
         .branchx => |branchx_payload| self.branchEx(branchx_payload),
         .svc => |svc_payload| self.svc(svc_payload),
+        .psr_transfer => |psr_payload| switch (psr_payload.op) {
+            .mrs => self.mrs(psr_payload),
+            .msr => self.msr(psr_payload),
+        },
         .undef => self.undef(),
         inline else => |payload| switch (payload.op) {
             inline else => |op| @field(self, @tagName(op))(payload),
@@ -150,9 +183,12 @@ fn flushPrefetch(self: *Self) void {
 }
 
 fn fetch(self: *Self) ?Instruction {
-    const opcode = self.prefetch_buffer[0];
+    const opcode = if (self.prefetch_buffer[0]) |op|
+        Instruction.parse(op, self.getReg(Register.from(PC)) - 8)
+    else
+        null;
     self.prefetch_buffer[0] = self.prefetch_buffer[1];
-    self.prefetch_buffer[1] = Instruction.parse(self.readWord(), self.getReg(Register.from(PC)));
+    self.prefetch_buffer[1] = self.readWord();
     self.getRegPtr(Register.from(PC)).* += 4;
     return opcode;
 }
@@ -301,9 +337,230 @@ fn alu(self: *Self, payload: instr.AluInstr) void {
     }
 }
 
+fn @"and"(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn eor(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn sub(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn rsb(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn add(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn adc(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn sbc(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn rsc(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn tst(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn teq(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn cmp(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn cmn(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn orr(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn mov(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn bic(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn mvn(self: *Self, payload: instr.AluInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn mul(self: *Self, payload: instr.MulInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn mla(self: *Self, payload: instr.MulInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn umull(self: *Self, payload: instr.MulInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn umlal(self: *Self, payload: instr.MulInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn smull(self: *Self, payload: instr.MulInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn smlal(self: *Self, payload: instr.MulInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn str(self: *Self, payload: instr.SDTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn ldr(self: *Self, payload: instr.SDTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn ldrh(self: *Self, payload: instr.HSDTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn strh(self: *Self, payload: instr.HSDTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn ldrsb(self: *Self, payload: instr.HSDTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn ldrsh(self: *Self, payload: instr.HSDTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn stm(self: *Self, payload: instr.BDTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn ldm(self: *Self, payload: instr.BDTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn swp(self: *Self, payload: instr.SDSwapInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
 fn branch(self: *Self, payload: instr.BranchInstr) void {
-    if (payload.op == .bl) self.setReg(Register.from(LR), self.getReg(Register.from(PC)));
-    self.setReg(Register.from(PC), payload.offset);
+    // BranchInstr already includes PC offset
+    self.setPC(payload.offset);
+}
+
+fn branchLink(self: *Self, payload: instr.BranchInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn branchEx(self: *Self, payload: instr.BranchExInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn msr(self: *Self, payload: instr.PSRTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn mrs(self: *Self, payload: instr.PSRTransferInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn svc(self: *Self, payload: instr.SVCInstr) void {
+    _ = payload;
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
+}
+
+fn undef(self: *Self) void {
+    _ = self;
+    CpuLog.err("unimplemented instruction", .{});
 }
 
 test "reg access" {
