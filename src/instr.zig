@@ -2,6 +2,8 @@ const std = @import("std");
 const utils = @import("utils.zig");
 const Field = utils.Field;
 const matches = @import("matches").matches;
+const BarrelShifter = @import("BarrelShifter.zig");
+const ShiftType = BarrelShifter.ShiftType;
 
 pub const Instruction = union(enum) {
     const Self = @This();
@@ -123,15 +125,10 @@ pub const Op2 = union(enum) {
             imm: u6,
             reg: Register,
         },
-        shift_type: enum(u2) {
-            lsl = 0x0,
-            lsr = 0x1,
-            asr = 0x2,
-            ror = 0x3,
-        },
+        shift_type: ShiftType,
         reg: Register,
     },
-    imm: u32,
+    imm: u12,
 
     pub fn format(self: Op2, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         switch (self) {
@@ -142,16 +139,14 @@ pub const Op2 = union(enum) {
                     try std.fmt.format(writer, "{}, {s} 0x{x}", .{ reg.reg, @tagName(reg.shift_type), imm }),
                 .reg => |rm| try std.fmt.format(writer, "{}, {s} {}", .{ reg.reg, @tagName(reg.shift_type), rm }),
             },
-            .imm => |imm| try std.fmt.format(writer, "0x{x}", .{imm}),
+            .imm => |imm| try std.fmt.format(writer, "0x{x}", .{BarrelShifter.armExpandImm(imm)}),
         }
     }
 
     fn parse(op: u32) Op2 {
         const imm = @truncate(u1, op >> 25) == 1;
         if (imm) {
-            return Op2{
-                .imm = std.math.rotr(u32, @truncate(u8, op), @as(u32, @truncate(u4, op >> 8)) * 2),
-            };
+            return Op2{ .imm = @truncate(u12, op) };
         } else {
             const RegTy = Field(Op2, .reg);
             const ShiftByTy = Field(RegTy, .shift_by);
@@ -355,12 +350,7 @@ pub const SDTransferInstr = struct {
         imm: u32,
         reg: struct {
             shift_amt: u5,
-            shift_type: enum(u2) {
-                lsl = 0x0,
-                lsr = 0x1,
-                asr = 0x2,
-                ror = 0x3,
-            },
+            shift_type: ShiftType,
             rm: Register,
         },
     },

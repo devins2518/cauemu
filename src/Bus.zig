@@ -5,6 +5,8 @@ const Allocator = std.mem.Allocator;
 const Ppu = @import("Ppu.zig");
 const Self = @This();
 
+const BusLog = std.log.scoped(.Bus);
+
 const BIOS_FILE = @embedFile("./gba.bin");
 
 const BIOS_START = 0x00000000;
@@ -96,13 +98,16 @@ pub fn readWord(self: *Self, addr: u32) u32 {
 }
 
 pub fn writeByte(self: *Self, addr: u32, n: u8) void {
+    BusLog.info("Writing byte 0x{x:0>2} to address 0x{x:0>8}", .{ n, addr });
     self.getAddr(addr, byteAlign).* = n;
 }
 pub fn writeHalfWord(self: *Self, addr: u32, n: u16) void {
+    BusLog.info("Writing halfword 0x{x:0>4} to address 0x{x:0>8}", .{ n, addr });
     const ptr = @ptrCast(*u16, self.getAddr(addr, halfWordAlign));
     std.mem.writeIntNative(u16, @ptrCast(*[2]u8, ptr), n);
 }
 pub fn writeWord(self: *Self, addr: u32, n: u32) void {
+    BusLog.info("Writing word 0x{x:0>8} to address 0x{x:0>8}", .{ n, addr });
     const ptr = @ptrCast(*u32, self.getAddr(addr, wordAlign));
     std.mem.writeIntNative(u32, @ptrCast(*[4]u8, ptr), n);
 }

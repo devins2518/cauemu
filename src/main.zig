@@ -42,6 +42,7 @@ pub fn main() !void {
 }
 
 test "static analysis" {
+    _ = @import("BarrelShifter.zig");
     _ = @import("Bus.zig");
     _ = @import("Cpu.zig");
     _ = @import("Emu.zig");
