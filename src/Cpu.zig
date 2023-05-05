@@ -371,10 +371,19 @@ fn smlal(self: *Self, payload: instr.MulInstr) void {
 
 fn str(self: *Self, payload: instr.SDTransferInstr) void {
     const rn = self.getReg(payload.rn);
+    const offset = switch (payload.offset) {
+        .imm => |imm| imm,
+        .reg => |reg| BarrelShifter.shiftC(
+            self.getReg(reg.rm),
+            reg.shift_type,
+            reg.shift_amt,
+            false,
+        ).imm,
+    };
     const offset_addr = if (payload.u == .up)
-        rn + payload.offset.imm
+        rn + offset
     else
-        rn - payload.offset.imm;
+        rn - offset;
     const address = if (payload.indexing == .pre)
         offset_addr
     else
@@ -391,9 +400,37 @@ fn str(self: *Self, payload: instr.SDTransferInstr) void {
 }
 
 fn ldr(self: *Self, payload: instr.SDTransferInstr) void {
-    _ = payload;
-    _ = self;
-    CpuLog.err("unimplemented instruction", .{});
+    const rn = self.getReg(payload.rn);
+    const offset = switch (payload.offset) {
+        .imm => |imm| imm,
+        .reg => |reg| BarrelShifter.shiftC(
+            self.getReg(reg.rm),
+            reg.shift_type,
+            reg.shift_amt,
+            false,
+        ).imm,
+    };
+    const offset_addr = if (payload.u == .up)
+        rn + offset
+    else
+        rn - offset;
+    const address = if (payload.indexing == .pre)
+        offset_addr
+    else
+        rn;
+    const data = if (payload.size == .byte)
+        self.bus.readByte(address)
+    else
+        self.bus.readWord(address);
+    if (payload.w) self.setReg(payload.rn, offset_addr);
+    if (payload.rd.r == PC) {
+        if (@truncate(u2, address) != 0b00)
+            CpuLog.warn("Unpredictable: LDR writing to PC with unaligned address", .{});
+        self.setPC(data);
+    } else self.setReg(
+        payload.rd,
+        BarrelShifter.ror(data, 8 * @as(u6, @truncate(u2, address))),
+    );
 }
 
 fn ldrh(self: *Self, payload: instr.HSDTransferInstr) void {
@@ -444,9 +481,14 @@ fn branch(self: *Self, payload: instr.BranchInstr) void {
 }
 
 fn branchLink(self: *Self, payload: instr.BranchInstr) void {
-    _ = payload;
-    _ = self;
-    CpuLog.err("unimplemented instruction", .{});
+    const pc = if (self.cpsr.state == .arm)
+        self.getPCStoreValue() - 4
+    else
+        (self.getPCStoreValue() & 0xFFFFFFFE) | 0x00000001;
+    self.setReg(Register.from(LR), pc);
+    // TODO: does not align(pc, 4)
+    const target_address = payload.offset;
+    self.branchWritePC(target_address);
 }
 
 fn branchEx(self: *Self, payload: instr.BranchExInstr) void {

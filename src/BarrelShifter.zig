@@ -85,6 +85,13 @@ pub fn rorC(value: u32, amt: u6) ResultC {
     };
 }
 
+pub fn ror(value: u32, amt: u6) u32 {
+    return if (amt == 0)
+        value
+    else
+        rorC(value, amt).imm;
+}
+
 pub fn rrxC(value: u32, carry_in: bool) ResultC {
     return ResultC{
         .imm = @as(u32, @boolToInt(carry_in)) << 31 | value >> 1,
